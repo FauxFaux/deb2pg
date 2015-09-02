@@ -15,7 +15,8 @@ create table packages (
     id bigserial primary key,
     name varchar not null,
     version varchar not null,
-    arch varchar not null
+    arch varchar not null,
+    size_limit bigint not null
 );
 
 create unique index package_name_version_arch on packages(name, version, arch);

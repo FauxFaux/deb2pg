@@ -10,7 +10,7 @@ from apt import apt_pkg
 
 import psycopg2
 
-SIZE_LIMIT = 100 * 1024
+SIZE_LIMIT = 500 * 1024
 
 def fetch(source_name, source_version, destdir):
     src = apt_pkg.SourceRecords()
@@ -83,15 +83,15 @@ def ingest(pkg_id, fh, cur, size, name):
     cur.execute('insert into files (package, path, hash) values (%s, %s, %s)',
                 (pkg_id, name, hashed))
 
-def main(source_package, source_version):
+def eat(source_package, source_version):
     #root_dir('/home/faux/.local/share/lxc/sid/rootfs')
 
     with tempfile.TemporaryDirectory() as destdir, \
             psycopg2.connect('dbname=deb2pg') as conn, \
             conn.cursor() as cur:
 
-        cur.execute('insert into packages(name, version, arch) values (%s, %s, %s) returning id',
-                (source_package, source_version, 'amd64'))
+        cur.execute('insert into packages(name, version, arch, size_limit) values (%s, %s, %s, %s) returning id',
+                (source_package, source_version, 'amd64', SIZE_LIMIT))
         pkg_id = cur.fetchone()
 
         fetch(source_package, source_version, destdir)
@@ -107,7 +107,11 @@ def main(source_package, source_version):
                             os.path.getsize(full_name),
                             rel_path)
 
+def main(specs):
+    for spec in specs:
+        eat(*spec.split('=', 1))
+
 if __name__ == '__main__':
     import sys
-    main(sys.argv[1], sys.argv[2])
+    main(sys.argv[1:])
 
