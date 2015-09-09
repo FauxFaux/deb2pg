@@ -90,8 +90,13 @@ def eat(source_package, source_version):
             psycopg2.connect('dbname=deb2pg') as conn, \
             conn.cursor() as cur:
 
-        cur.execute('insert into packages(name, version, arch, size_limit) values (%s, %s, %s, %s) returning id',
-                (source_package, source_version, 'amd64', SIZE_LIMIT))
+        try:
+            cur.execute('insert into packages(name, version, arch, size_limit) values (%s, %s, %s, %s) returning id',
+                    (source_package, source_version, 'amd64', SIZE_LIMIT))
+        except psycopg2.IntegrityError:
+            print(source_package, source_version, 'already exists, ignoring')
+            return
+
         pkg_id = cur.fetchone()
 
         fetch(source_package, source_version, destdir)
