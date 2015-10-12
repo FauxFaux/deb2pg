@@ -23,7 +23,7 @@ def fetch(source_name, source_version, destdir):
     while source_lookup and source_version != src.version:
         source_lookup = src.lookup(source_name)
     if not source_lookup:
-        raise ValueError("No source for %r" % self)
+        raise ValueError("No source for %s %s" % (source_name, source_version))
     files = list()
     for md5, size, path, type_ in src.files:
         base = os.path.basename(path)
@@ -36,7 +36,7 @@ def fetch(source_name, source_version, destdir):
 
     for item in acq.items:
         if item.status != item.STAT_DONE:
-            raise FetchError("The item %r could not be fetched: %s" %
+            raise ValueError("The item %s could not be fetched: %s" %
                              (item.destfile, item.error_text))
 
 
@@ -92,7 +92,7 @@ def eat(source_package, source_version):
             cur.execute('insert into packages(name, version, arch, size_limit) values (%s, %s, %s, %s) returning id',
                     (source_package, source_version, 'amd64', SIZE_LIMIT))
         except psycopg2.IntegrityError:
-            print(source_package, source_version, 'already exists, ignoring')
+            #print(source_package, source_version, 'already exists, ignoring')
             return
 
         pkg_id = cur.fetchone()
