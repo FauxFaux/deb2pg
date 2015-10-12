@@ -26,6 +26,6 @@ create unique index package_name_version_arch on packages(name, version, arch);
 
 create view package_file_contents as select packages.name,packages.version,files.path,files.hash,blobs.content from packages inner join files on (packages.id=files.package) inner join blobs on (blobs.hash = files.hash);
 
-create index content_contains_date_hash on blobs using hash ((content like '%date %'));
+create index content_contains_date on blobs ((content like '%date %'));
 create index file_hash on files using hash (hash);
 
