@@ -1,3 +1,5 @@
+create type git_mode as enum ('100644', '100755', '120000');
+
 create table blobs (
     hash varchar primary key,
     content varchar not null
@@ -5,6 +7,7 @@ create table blobs (
 
 create table files (
     package bigserial not null,
+    mode git_mode not null,
     path varchar not null,
     hash varchar
 );

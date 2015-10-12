@@ -60,28 +60,26 @@ def root_dir(rootdir):
                         os.path.join(rootdir, "usr", "bin", "dpkg"))
     apt_pkg.init_system()
 
-def ingest(pkg_id, fh, cur, size, name):
-    hashed = None
+def ingest(fh, cur):
+    return write_blob(cur, fh.read())
 
-    if size <= SIZE_LIMIT:
-        blob = fh.read()
-        hasher = hashlib.sha1()
-        hasher.update('blob {}\0'.format(len(blob)).encode('utf-8'))
-        hasher.update(blob)
-        hashed = hasher.hexdigest()
-        try:
-            blob = blob.decode('utf-8')
-        except:
-            pass
+def write_blob(cur, blob):
+    hasher = hashlib.sha1()
+    hasher.update('blob {}\0'.format(len(blob)).encode('utf-8'))
+    hasher.update(blob)
+    hashed = hasher.hexdigest()
+    try:
+        blob = blob.decode('utf-8')
+    except:
+        pass
 
-        # there's a race-condition here, but the unique index
-        # will just crash us if we mess up anyway.
-        cur.execute('insert into blobs (hash, content) select %s, %s'
-                            + ' where not exists (select 1 from blobs where hash=%s)',
-                            (hashed, blob, hashed))
+    # there's a race-condition here, but the unique index
+    # will just crash us if we mess up anyway.
+    cur.execute('insert into blobs (hash, content) select %s, %s'
+                        + ' where not exists (select 1 from blobs where hash=%s)',
+                        (hashed, blob, hashed))
 
-    cur.execute('insert into files (package, path, hash) values (%s, %s, %s)',
-                (pkg_id, name, hashed))
+    return hashed
 
 def eat(source_package, source_version):
     #root_dir('/home/faux/.local/share/lxc/sid/rootfs')
@@ -104,17 +102,44 @@ def eat(source_package, source_version):
         for dirpath, _, filelist in os.walk(pkgfolder):
             for f in filelist:
                 full_name = os.path.join(dirpath, f)
-                with open(full_name, 'rb') as fh:
-                    rel_path = os.path.join(os.path.relpath(dirpath, pkgfolder), f)
-                    if rel_path[0:2] == './':
-                        rel_path = rel_path[2:]
-                    ingest(pkg_id, fh, cur,
-                            os.path.getsize(full_name),
-                            rel_path)
+                stat = os.lstat(full_name)
+                size = stat.st_size
+                symlink = bool(stat.st_mode & 0o020000)
+                user_exec = bool(stat.st_mode & 0o100)
+
+                rel_path = os.path.join(os.path.relpath(dirpath, pkgfolder), f)
+                if rel_path[0:2] == './':
+                    rel_path = rel_path[2:]
+
+                if symlink:
+                    mode = '120000'
+                elif user_exec:
+                    mode = '100755'
+                else:
+                    mode = '100644'
+
+                hashed = None
+                if size < SIZE_LIMIT:
+                    if not symlink:
+                        with open(full_name, 'rb') as fh:
+                            hashed = ingest(fh, cur)
+                    else:
+                        hashed = write_blob(cur, os.readlink(full_name).encode('utf-8'))
+
+                try:
+                    cur.execute('insert into files (package, mode, path, hash) values (%s, %s, %s, %s)',
+                                    (pkg_id, mode, rel_path.encode('utf-8', 'backslashreplace'), hashed))
+                except:
+                    print('error processing ', source_package, source_version, hashed, rel_path.encode('utf-8', 'backslashreplace'))
+                    raise
 
 def main(specs):
     for spec in specs:
-        eat(*spec.split('=', 1))
+        try:
+            eat(*spec.split('=', 1))
+        except Exception as e:
+            import traceback
+            print(spec, ' failed to ingest', traceback.format_exc())
 
 if __name__ == '__main__':
     import sys
