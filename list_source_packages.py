@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
 import os
 
-import apt
 from apt import apt_pkg
 
 
 def list():
     src = apt_pkg.SourceRecords()
-    acq = apt_pkg.Acquire(apt.progress.text.AcquireProgress())
 
-    source_lookup = src.restart()
+    src.restart()
 
     while src.step():
         yield src.package + '=' + src.version
