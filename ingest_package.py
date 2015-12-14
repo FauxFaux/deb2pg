@@ -12,6 +12,10 @@ from apt import apt_pkg
 SIZE_LIMIT = 500 * 1024
 
 
+def connect_to_db():
+    return psycopg2.connect('dbname=deb2pg')
+
+
 def fetch(source_name, source_version, destdir):
     src = apt_pkg.SourceRecords()
     acq = apt_pkg.Acquire(apt.progress.text.AcquireProgress())
@@ -44,56 +48,59 @@ def fetch(source_name, source_version, destdir):
     return destdir
 
 
-# lifted directly from apt.cache.Cache():
-def root_dir(rootdir):
-    rootdir = os.path.abspath(rootdir)
-    if os.path.exists(rootdir + "/etc/apt/apt.conf"):
-        apt_pkg.read_config_file(apt_pkg.config,
-                                 rootdir + "/etc/apt/apt.conf")
-    if os.path.isdir(rootdir + "/etc/apt/apt.conf.d"):
-        apt_pkg.read_config_dir(apt_pkg.config,
-                                rootdir + "/etc/apt/apt.conf.d")
-    apt_pkg.config.set("Dir", rootdir)
-    apt_pkg.config.set("Dir::State::status",
-                       rootdir + "/var/lib/dpkg/status")
-    apt_pkg.config.set("Dir::bin::dpkg",
-                       os.path.join(rootdir, "usr", "bin", "dpkg"))
-    apt_pkg.init_system()
+class BlobWriter:
+    def __enter__(self):
+        self.conn = connect_to_db()
+        self.cur = self.conn.cursor()
+        return self
 
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # don't care why; other people's problem
+        self.cur.close()
+        self.conn.close()
 
-def ingest(fh, cur):
-    return write_blob(cur, fh.read())
+    def write_blob(self, blob):
+        hasher = hashlib.sha1()
+        hasher.update('blob {}\0'.format(len(blob)).encode('utf-8'))
+        hasher.update(blob)
+        hashed = hasher.hexdigest()
+        try:
+            blob = blob.decode('utf-8')
+        except:
+            pass
 
+        uuid_part = hashed[0:32]
 
-def write_blob(cur, blob):
-    hasher = hashlib.sha1()
-    hasher.update('blob {}\0'.format(len(blob)).encode('utf-8'))
-    hasher.update(blob)
-    hashed = hasher.hexdigest()
-    try:
-        blob = blob.decode('utf-8')
-    except:
-        pass
+        # there's a race-condition here, but the unique index
+        # will just crash us if we mess up anyway.
 
-    # there's a race-condition here, but the unique index
-    # will just crash us if we mess up anyway.
-    cur.execute('insert into blobs (hash, content) select %s, %s'
-                + ' where not exists (select 1 from blobs where hash=%s)',
-                (hashed, blob, hashed))
+        upper_part = int(hashed[32:], 16)
+        if upper_part & 0x80000000:
+            upper_part -= 0x100000000
 
-    return hashed
+        for i in range(5):
+            try:
+                self.cur.execute('insert into blobs (hash_prefix, hash_suffix, content) select %s, %s, %s' +
+                                 ' where not exists (select 1 from blobs where hash_prefix=%s)',
+                                 (uuid_part, upper_part, blob, uuid_part))
+                self.conn.commit()
+                return uuid_part
+            except psycopg2.IntegrityError:
+                self.conn.rollback()
+                pass
 
 
 def eat(source_package, source_version):
     # root_dir('/home/faux/.local/share/lxc/sid/rootfs')
 
     with tempfile.TemporaryDirectory() as destdir, \
-            psycopg2.connect('dbname=deb2pg') as conn, \
-            conn.cursor() as cur:
+            connect_to_db() as conn, \
+            conn.cursor() as cur, \
+            BlobWriter() as writer:
 
         try:
-            cur.execute('insert into packages(name, version, arch, size_limit) values (%s, %s, %s, %s) returning id',
-                        (source_package, source_version, 'amd64', SIZE_LIMIT))
+            cur.execute('insert into packages(name, version, size_limit) values (%s, %s, %s) returning id',
+                        (source_package, source_version, SIZE_LIMIT))
         except psycopg2.IntegrityError:
             # print(source_package, source_version, 'already exists, ignoring')
             return
@@ -125,13 +132,13 @@ def eat(source_package, source_version):
                 if size < SIZE_LIMIT:
                     if not symlink:
                         with open(full_name, 'rb') as fh:
-                            hashed = ingest(fh, cur)
+                            hashed = writer.write_blob(fh.read())
                     else:
-                        hashed = write_blob(cur, os.readlink(full_name).encode('utf-8'))
+                        hashed = writer.write_blob(os.readlink(full_name).encode('utf-8'))
 
                 try:
-                    cur.execute('insert into files (package, mode, path, hash) values (%s, %s, %s, %s)',
-                                (pkg_id, mode, rel_path.encode('utf-8', 'backslashreplace'), hashed))
+                    cur.execute('insert into files (package, mode, path, hash_prefix) values (%s, %s, %s, %s)',
+                                (pkg_id, mode, rel_path.encode('utf-8', 'backslashreplace').decode('utf-8'), hashed))
                 except:
                     print('error processing ', source_package, source_version, hashed,
                           rel_path.encode('utf-8', 'backslashreplace'))
@@ -140,11 +147,11 @@ def eat(source_package, source_version):
 
 def main(specs):
     for spec in specs:
-        try:
-            eat(*spec.split('=', 1))
-        except Exception as e:
-            import traceback
-            print(spec, ' failed to ingest', traceback.format_exc())
+        # try:
+        eat(*spec.split('=', 1))
+        # except Exception as e:
+        #     import traceback
+        #     print(spec, ' failed to ingest', traceback.format_exc())
 
 
 if __name__ == '__main__':

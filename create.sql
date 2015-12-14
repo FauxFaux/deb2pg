@@ -2,28 +2,27 @@ CREATE TYPE git_mode AS ENUM ('100644', '100755', '120000');
 
 CREATE TABLE blobs (
   hash_prefix UUID PRIMARY KEY,
-  hash_suffix INT,
+  hash_suffix INT     NOT NULL,
   content     VARCHAR NOT NULL
 );
 
 CREATE TABLE files (
-  package BIGSERIAL NOT NULL,
-  mode    git_mode  NOT NULL,
-  path    VARCHAR   NOT NULL,
-  hash    VARCHAR
+  package     BIGINT   NOT NULL,
+  mode        git_mode NOT NULL,
+  hash_prefix UUID,
+  path        VARCHAR  NOT NULL
 );
 
 CREATE UNIQUE INDEX package_paths ON files (package, path);
 
 CREATE TABLE packages (
   id         BIGSERIAL PRIMARY KEY,
+  size_limit BIGINT  NOT NULL,
   name       VARCHAR NOT NULL,
-  version    VARCHAR NOT NULL,
-  arch       VARCHAR NOT NULL,
-  size_limit BIGINT  NOT NULL
+  version    VARCHAR NOT NULL
 );
 
-CREATE UNIQUE INDEX package_name_version_arch ON packages (name, version, arch);
+CREATE UNIQUE INDEX package_name_version_arch ON packages (name, version);
 
 CREATE VIEW package_file_contents AS
   SELECT
@@ -54,3 +53,8 @@ CREATE INDEX file_hash ON files USING HASH (hash);
 EXPLAIN ANALYZE UPDATE blobs
 SET hash_prefix = lpad(hash, 32, '0') :: UUID,
   hash_suffix   = (('x' || lpad(substring(hash FROM 33), 8, '0')) :: BIT(32) :: INT);
+
+
+TRUNCATE TABLE packages;
+TRUNCATE TABLE files;
+TRUNCATE TABLE blobs;
