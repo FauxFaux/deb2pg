@@ -1,46 +1,56 @@
-create type git_mode as enum ('100644', '100755', '120000');
+CREATE TYPE git_mode AS ENUM ('100644', '100755', '120000');
 
-create table blobs (
-    hash_prefix uuid primary key,
-    hash_suffix int,
-    content varchar not null,
+CREATE TABLE blobs (
+  hash_prefix UUID PRIMARY KEY,
+  hash_suffix INT,
+  content     VARCHAR NOT NULL
 );
 
-create table files (
-    package bigserial not null,
-    mode git_mode not null,
-    path varchar not null,
-    hash varchar
+CREATE TABLE files (
+  package BIGSERIAL NOT NULL,
+  mode    git_mode  NOT NULL,
+  path    VARCHAR   NOT NULL,
+  hash    VARCHAR
 );
 
-create unique index package_paths on files (package, path);
+CREATE UNIQUE INDEX package_paths ON files (package, path);
 
-create table packages (
-    id bigserial primary key,
-    name varchar not null,
-    version varchar not null,
-    arch varchar not null,
-    size_limit bigint not null
+CREATE TABLE packages (
+  id         BIGSERIAL PRIMARY KEY,
+  name       VARCHAR NOT NULL,
+  version    VARCHAR NOT NULL,
+  arch       VARCHAR NOT NULL,
+  size_limit BIGINT  NOT NULL
 );
 
-create unique index package_name_version_arch on packages(name, version, arch);
+CREATE UNIQUE INDEX package_name_version_arch ON packages (name, version, arch);
 
-create view package_file_contents as select packages.name,packages.version,files.path,files.hash,blobs.content from packages inner join files on (packages.id=files.package) inner join blobs on (blobs.hash = files.hash);
- SELECT packages.name,
+CREATE VIEW package_file_contents AS
+  SELECT
+    packages.name,
     packages.version,
-        files.path,
-            files.hash,
-                blobs.content
-                   FROM packages
-                     JOIN files ON packages.id = files.package
-                         JOIN blobs ON blobs.hash::text = files.hash::text;
+    files.path,
+    files.hash,
+    blobs.content
+  FROM packages
+    INNER JOIN files ON (packages.id = files.package)
+    INNER JOIN blobs ON (blobs.hash = files.hash);
+
+SELECT
+  packages.name,
+  packages.version,
+  files.path,
+  files.hash,
+  blobs.content
+FROM packages
+  JOIN files ON packages.id = files.package
+  JOIN blobs ON blobs.hash :: TEXT = files.hash :: TEXT;
 
 
-
-
-create index content_contains_date on blobs ((content like '%date %'));
-create index file_hash on files using hash (hash);
+CREATE INDEX content_contains_date ON blobs ((content LIKE '%date %'));
+CREATE INDEX file_hash ON files USING HASH (hash);
 
 -- https://stackoverflow.com/questions/8316164/convert-hex-in-text-representation-to-decimal-number
-explain analyze update blobs set hash_prefix=lpad(hash, 32, '0')::uuid, hash_suffix=(('x' || lpad(substring(hash from 33), 8, '0'))::bit(32)::int);
-
+EXPLAIN ANALYZE UPDATE blobs
+SET hash_prefix = lpad(hash, 32, '0') :: UUID,
+  hash_suffix   = (('x' || lpad(substring(hash FROM 33), 8, '0')) :: BIT(32) :: INT);
