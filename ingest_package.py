@@ -9,7 +9,7 @@ import apt
 import psycopg2
 from apt import apt_pkg
 
-SIZE_LIMIT = 500 * 1024
+SIZE_LIMIT = 5 * 1024 * 1024
 
 
 def connect_to_db():

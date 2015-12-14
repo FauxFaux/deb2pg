@@ -58,3 +58,9 @@ SET hash_prefix = lpad(hash, 32, '0') :: UUID,
 TRUNCATE TABLE packages;
 TRUNCATE TABLE files;
 TRUNCATE TABLE blobs;
+
+
+explain SELECT *
+FROM files
+  INNER JOIN blobs USING (hash_prefix)
+WHERE package = 17;
