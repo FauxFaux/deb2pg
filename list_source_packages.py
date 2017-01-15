@@ -1,39 +1,30 @@
-#!/usr/bin/env python3
-import os
+#!/usr/bin/python3
 
-from apt import apt_pkg
+import collections
 
+import apt
+import apt_pkg
 
-def list():
-    src = apt_pkg.SourceRecords()
+cache = apt.cache.Cache(rootdir='fakedroot')
 
-    src.restart()
+def versions_in(suite):
+    source_versions = collections.defaultdict(set)
 
-    while src.step():
-        yield src.package + '=' + src.version
+    for package in cache:
+        for version in package.versions:
+            if suite and suite not in (origin.archive for origin in version.origins):
+                continue
 
+            source_versions[version.source_name].add(version.source_version)
 
-# lifted directly from apt.cache.Cache():
-def root_dir(rootdir):
-    rootdir = os.path.abspath(rootdir)
-    if os.path.exists(rootdir + "/etc/apt/apt.conf"):
-        apt_pkg.read_config_file(apt_pkg.config,
-                                 rootdir + "/etc/apt/apt.conf")
-    if os.path.isdir(rootdir + "/etc/apt/apt.conf.d"):
-        apt_pkg.read_config_dir(apt_pkg.config,
-                                rootdir + "/etc/apt/apt.conf.d")
-    apt_pkg.config.set("Dir", rootdir)
-    apt_pkg.config.set("Dir::State::status",
-                       rootdir + "/var/lib/dpkg/status")
-    apt_pkg.config.set("Dir::bin::dpkg",
-                       os.path.join(rootdir, "usr", "bin", "dpkg"))
-    apt_pkg.init_system()
+    return source_versions
 
 
-def main():
-    for pkg in list():
-        print(pkg)
+if '__main__' == __name__:
+    import sys
+    sources = versions_in(sys.argv[1] if len(sys.argv) > 1 else None)
+    for src in sorted(sources.keys()):
+        # sort lexographically for determinism, not for any other reason
+        for ver in sorted(sources[src]):
+            print('{}={}'.format(src, ver))
 
-
-if __name__ == '__main__':
-    main()
