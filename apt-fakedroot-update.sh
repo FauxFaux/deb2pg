@@ -23,7 +23,7 @@ for dist in stable testing unstable experimental; do
 done > etc/apt/sources.list
 
 printf '
-Dir ".";
+Dir "'$(pwd)'";
 Acquire::Pdiffs "false";
 Debug::NoLocking "1";
 APT::Architectures="amd64 i386";
