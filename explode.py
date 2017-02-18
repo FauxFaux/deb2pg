@@ -8,14 +8,59 @@ from typing import List
 
 import magic
 
-UNPACKABLE_TYPES = {
+ARCHIVE_TYPES = {
+    'application/java-archive',
+    'application/x-archive',
     'application/x-tar',
+    'application/zip',
 }
 
-M = magic.open(magic.MIME | magic.COMPRESS)
-M.load()
+MAGIC_COMPRESSED = magic.open(magic.MIME | magic.COMPRESS)
+MAGIC_COMPRESSED.load()
+
+MAGIC_MIME = magic.open(magic.MIME)
+MAGIC_MIME.load()
 
 ignored_mime_types = set()
+
+
+def guess_can_extract(b: bytes) -> bool:
+    """
+    Guess if we want to try and run libarchive on this.
+    Note that we don't want libarchive to try and process plain gzip files...
+    they need handling differently.
+    """
+
+    if len(b) < 8:
+        return False
+
+    if b[0] in {
+        b'#'[0],  # shebang, comment, #include, ...
+        b'<'[0],  # html, <!doctype, <?php, xml, ...
+    }:
+        return False
+
+    if b[0:2] in {
+        b'/*',  # license header in c/java/...
+    }:
+        return False
+
+    outer_mime = MAGIC_MIME.buffer(b)
+
+    major, _ = outer_mime.split('/', 1)
+    if major in {'text', 'image', 'audio', 'message'}:
+        return False
+
+    if outer_mime in ARCHIVE_TYPES:
+        return True
+
+    detected = MAGIC_COMPRESSED.buffer(b)
+    mime_type, _ = detected.split('; ', 1)
+    if mime_type in ARCHIVE_TYPES:
+        return True
+
+    ignored_mime_types.add(mime_type)
+    return False
 
 
 def unpack(fd: io.BufferedReader, path: List[str]):
@@ -30,10 +75,7 @@ def unpack(fd: io.BufferedReader, path: List[str]):
 
             # returns different types if non-regular, but we know it's regular
             r = tar.extractfile(entry)  # type: tarfile.ExFileObject
-            detected = M.buffer(r.peek(1024))
-            mime_type, _ = detected.split('; ', 1)
-            if mime_type not in UNPACKABLE_TYPES:
-                ignored_mime_types.add(mime_type)
+            if not guess_can_extract(r.peek(1024)):
                 continue
 
             with tempfile.TemporaryFile() as tmp:
