@@ -1,19 +1,12 @@
 #!/usr/bin/python3
 import io
+import shutil
 import subprocess
 import tarfile
-
-# apt:python3-magic
 import tempfile
 from typing import List
 
 import magic
-
-
-# def dump(entry: libarchive.ArchiveEntry):
-#     print(entry.filetype, entry.mode, entry.mtime, entry.name, entry.path, entry.pathname, entry.size, entry.linkname,
-#           entry.linkpath, entry.strmode)
-import shutil
 
 UNPACKABLE_TYPES = {
     'application/x-tar',
@@ -23,6 +16,7 @@ M = magic.open(magic.MIME | magic.COMPRESS)
 M.load()
 
 ignored_mime_types = set()
+
 
 def unpack(fd: io.BufferedReader, path: List[str]):
     print('unpacking {}'.format(path))
