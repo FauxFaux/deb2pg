@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+import collections
 import io
 import shutil
 import subprocess
@@ -10,7 +11,8 @@ import magic
 
 ARCHIVE_TYPES = {
     'application/java-archive',
-    'application/x-archive',
+    # 'application/x-archive', (i.e. .lib files: not super useful,
+    #  and fails anyway as the internals can't be repacked as .tar)
     'application/x-tar',
     'application/zip',
 }
@@ -22,6 +24,7 @@ MAGIC_MIME = magic.open(magic.MIME)
 MAGIC_MIME.load()
 
 ignored_mime_types = set()
+useless_miming = collections.Counter()
 
 
 def guess_can_extract(b: bytes) -> bool:
@@ -37,29 +40,53 @@ def guess_can_extract(b: bytes) -> bool:
     if b[0] in {
         b'#'[0],  # shebang, comment, #include, ...
         b'<'[0],  # html, <!doctype, <?php, xml, ...
+        b'\n'[0],  # probably text
     }:
         return False
 
     if b[0:2] in {
         b'/*',  # license header in c/java/...
+        b'//',  # license header in c/java/...
+        b'\xca\xfe',  # java .class
     }:
         return False
 
-    outer_mime = MAGIC_MIME.buffer(b)
+    if b[0:4] in {
+        b'\x89PNG',
+    }:
+        return False
+
+    if b[0:6] in {
+        b'GIF87a',
+        b'GIF89a',
+        b'@echo ',  # bat files
+        b'packag',  # java source
+        b'import',  # java source
+    }:
+        return False
+
+    outer_mime = MAGIC_MIME.buffer(b).split('; ')[0]
 
     major, _ = outer_mime.split('/', 1)
     if major in {'text', 'image', 'audio', 'message'}:
+        useless_miming[b[0:6]] += 1
         return False
 
     if outer_mime in ARCHIVE_TYPES:
+        print('outer: {}'.format(outer_mime))
         return True
 
     detected = MAGIC_COMPRESSED.buffer(b)
     mime_type, _ = detected.split('; ', 1)
     if mime_type in ARCHIVE_TYPES:
+        print('inner: {}'.format(detected))
         return True
 
+    if 'java-archive' in mime_type or '/zip' in mime_type:
+        print("problemo")
+
     ignored_mime_types.add(mime_type)
+    useless_miming[b[0:6]] += 1
     return False
 
 
@@ -85,7 +112,7 @@ def unpack(fd: io.BufferedReader, path: List[str]):
                 unpack(tmp, path + [entry.name])
 
     if 0 != p.wait():
-        raise Exception('bsdtar failed')
+        print('bsdtar failed')
 
 
 def main(path):
@@ -93,6 +120,7 @@ def main(path):
         unpack(f, [path])
 
     print(ignored_mime_types)
+    print(useless_miming)
 
 
 if __name__ == '__main__':
