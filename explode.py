@@ -48,6 +48,7 @@ def guess_can_extract(b: bytes) -> bool:
         b'/*',  # license header in c/java/...
         b'//',  # license header in c/java/...
         b'\xca\xfe',  # java .class
+        b'\'\\',  # troff (e.g. man pages)
     }:
         return False
 
@@ -62,6 +63,7 @@ def guess_can_extract(b: bytes) -> bool:
         b'@echo ',  # bat files
         b'packag',  # java source
         b'import',  # java source
+        b'Manife',  # java source
     }:
         return False
 
@@ -102,7 +104,7 @@ def unpack(fd: io.BufferedReader, path: List[str]):
 
             # returns different types if non-regular, but we know it's regular
             r = tar.extractfile(entry)  # type: tarfile.ExFileObject
-            if not guess_can_extract(r.peek(1024)):
+            if not guess_can_extract(r.peek(64)):
                 continue
 
             with tempfile.TemporaryFile() as tmp:
