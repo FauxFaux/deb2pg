@@ -94,7 +94,7 @@ def guess_can_extract(b: bytes) -> bool:
 
 def unpack(fd: io.BufferedReader, path: List[str]):
     print('unpacking {}'.format(path))
-    p = subprocess.Popen(['bsdtar', '-c', '-f', '-', '@-'], stdin=fd, stdout=subprocess.PIPE, stderr=sys.stderr)
+    p = subprocess.Popen(['bsdtar', '-c', '-f', '-', '@-'], stdin=fd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     with tarfile.open(mode='r|', fileobj=p.stdout) as tar:  # type: tarfile.TarFile
         for entry in tar:  # type: tarfile.TarInfo
             if not entry.isreg():
@@ -105,6 +105,12 @@ def unpack(fd: io.BufferedReader, path: List[str]):
             # returns different types if non-regular, but we know it's regular
             r = tar.extractfile(entry)  # type: tarfile.ExFileObject
             if not guess_can_extract(r.peek(64)):
+                packer = subprocess.Popen(['./pack.sh'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                shutil.copyfileobj(r, packer.stdin)
+                packer.stdin.close()
+                if 0 != packer.wait():
+                    raise Exception("packing failed")
+                hash = packer.stdout.readline()
                 continue
 
             with tempfile.TemporaryFile() as tmp:
