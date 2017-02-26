@@ -2,12 +2,13 @@
 import collections
 import hashlib
 import io
+import json
 import os
 import shutil
 import subprocess
 import tarfile
 import tempfile
-from typing import List
+from typing import Any, List
 
 import magic
 
@@ -26,6 +27,15 @@ ARCHIVE_TYPES = {
     'application/x-tar',
     'application/zip',
 }
+
+
+def info(msg: Any):
+    sys.stderr.write("info: {}\n".format(msg))
+
+
+def warn(msg: Any):
+    sys.stderr.write("info: {}\n".format(msg))
+
 
 MAGIC_COMPRESSED = magic.open(magic.MIME | magic.COMPRESS)
 MAGIC_COMPRESSED.load()
@@ -99,17 +109,14 @@ def guess_can_extract(b: bytes) -> bool:
         return False
 
     if outer_mime in ARCHIVE_TYPES:
-        print('outer: {}'.format(outer_mime))
+        info('outer: {}'.format(outer_mime))
         return True
 
     detected = MAGIC_COMPRESSED.buffer(b)
     mime_type, _ = detected.split('; ', 1)
     if mime_type in ARCHIVE_TYPES:
-        print('inner: {}'.format(detected))
+        info('inner: {}'.format(detected))
         return True
-
-    if 'java-archive' in mime_type or '/zip' in mime_type:
-        print("problemo")
 
     ignored_mime_types.add(mime_type)
     useless_miming[b[0:6]] += 1
@@ -120,33 +127,39 @@ Entry = collections.namedtuple('Entry', ['name', 'size', 'mode', 'hash'])
 
 
 def unpack(fd: io.TextIOWrapper, path: List[str]):
-    print('unpacking {}'.format(path))
+    info('unpacking {}'.format(path))
     p = subprocess.Popen(['bsdtar', '-c', '-f', '-', '@-'], stdin=fd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    tree = []  # type: List[Entry]
+    entries = []  # type: List[Entry]
     with tarfile.open(mode='r|', fileobj=p.stdout) as tar:  # type: tarfile.TarFile
         for entry in tar:  # type: tarfile.TarInfo
             if not entry.isreg():
                 if not entry.isdir():
-                    print('irregular: {}//{}', path, entry)
+                    warn('irregular: {}//{}'.format(path, entry))
                 continue
 
             # returns different types if non-regular, but we know it's regular
             r = tar.extractfile(entry)  # type: tarfile.ExFileObject
+            our_path = path + [os.path.normpath(entry.name)]
+
             if not guess_can_extract(r.peek(64)):
                 digest = pack_into_temp_file(r)
 
-                tree.append(Entry(path + [entry.name], entry.size, entry.mode, digest))
+                entries.append(Entry(our_path, entry.size, entry.mode, digest))
                 continue
 
             with tempfile.TemporaryFile() as tmp:
                 shutil.copyfileobj(r, tmp)
                 tmp.flush()
                 tmp.seek(0)
-                unpack(tmp, path + [entry.name])
-    print(tree)
+                unpack(tmp, our_path)
 
     if 0 != p.wait():
-        print('bsdtar failed')
+        warn('bsdtar failed')
+        return
+
+    for item in entries:
+        json.dump(item._asdict(), sys.stdout)
+        sys.stdout.write('\n')
 
 
 def pack_into_temp_file(source: io.BufferedReader):
@@ -166,8 +179,8 @@ def pack_into_temp_file(source: io.BufferedReader):
 
         packer.stdin.close()
         if 0 != packer.wait():
-            print(packer.stdout.readline())
-            print(packer.stderr.readline())
+            warn(packer.stdout.read())
+            warn(packer.stderr.read())
             raise Exception("packing failed")
 
         digest = h.hexdigest()
@@ -179,8 +192,8 @@ def main(path):
     with open(path) as f:
         unpack(f, [path])
 
-    print(ignored_mime_types)
-    print(useless_miming)
+    info(ignored_mime_types)
+    info(useless_miming)
 
 
 if __name__ == '__main__':
