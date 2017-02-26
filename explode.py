@@ -92,7 +92,7 @@ def guess_can_extract(b: bytes) -> bool:
     return False
 
 
-def unpack(fd: io.BufferedReader, path: List[str]):
+def unpack(fd: io.TextIOWrapper, path: List[str]):
     print('unpacking {}'.format(path))
     p = subprocess.Popen(['bsdtar', '-c', '-f', '-', '@-'], stdin=fd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     with tarfile.open(mode='r|', fileobj=p.stdout) as tar:  # type: tarfile.TarFile
