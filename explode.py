@@ -8,7 +8,7 @@ import shutil
 import subprocess
 import tarfile
 import tempfile
-from typing import Any, List
+from typing import Any, List, Tuple
 
 import magic
 
@@ -123,7 +123,7 @@ def guess_can_extract(b: bytes) -> bool:
     return False
 
 
-Entry = collections.namedtuple('Entry', ['name', 'size', 'mode', 'hash'])
+Entry = collections.namedtuple('Entry', ['name', 'size', 'mode', 'hash', 'text'])
 
 
 def unpack(fd: io.TextIOWrapper, path: List[str]):
@@ -142,9 +142,9 @@ def unpack(fd: io.TextIOWrapper, path: List[str]):
             our_path = path + [os.path.normpath(entry.name)]
 
             if not guess_can_extract(r.peek(64)):
-                digest = pack_into_temp_file(r)
+                digest, text = pack_into_temp_file(r)
 
-                entries.append(Entry(our_path, entry.size, entry.mode, digest))
+                entries.append(Entry(our_path, entry.size, entry.mode, digest, text))
                 continue
 
             with tempfile.TemporaryFile() as tmp:
@@ -162,7 +162,7 @@ def unpack(fd: io.TextIOWrapper, path: List[str]):
         sys.stdout.write('\n')
 
 
-def pack_into_temp_file(source: io.BufferedReader):
+def pack_into_temp_file(source: io.BufferedReader) -> Tuple[str, bool]:
     with ReNameableTemporaryFile(create_in=OUTPUT_TO) as f:
         packer = subprocess.Popen(['lz4', '-5q', '-', f.name],
                                   stdin=subprocess.PIPE,
@@ -170,10 +170,15 @@ def pack_into_temp_file(source: io.BufferedReader):
                                   stderr=subprocess.PIPE)
         h = hashlib.sha256()  # type: SHA256.SHA256Hash
 
+        text = True
         while True:
             buf = source.read(16 * 1024)
             if not buf:
                 break
+
+            if text:
+                text = is_text(buf)
+
             packer.stdin.write(buf)
             h.update(buf)
 
@@ -185,7 +190,26 @@ def pack_into_temp_file(source: io.BufferedReader):
 
         digest = h.hexdigest()
         os.rename(f.name, os.path.join(OUTPUT_TO, digest))
-        return digest
+        return digest, text
+
+
+def is_text(buf: bytes) -> bool:
+    """
+    >>> is_text(b"\\0")
+    False
+    >>> is_text(b"\\t")
+    True
+    >>> is_text(b"\\r")
+    True
+    >>> is_text(b" ")
+    True
+    >>> is_text(b"Testing, testing,\\n123.")
+    True
+    """
+    for char in buf:
+        if char < 9 or 14 <= char < 32:
+            return False
+    return True
 
 
 def main(path):
