@@ -132,7 +132,7 @@ def handle_entry(entry: tarfile.TarInfo, tar: tarfile.TarFile, path: List[str]):
     if not entry.isreg():
         if not entry.isdir():
             warn('irregular: {}//{}'.format(path, entry))
-        yield Entry(our_path, entry.size, entry.mode, None, False)
+            yield Entry(our_path, entry.size, entry.mode, None, False)
         return
 
         # returns different types if non-regular, but we know it's regular
