@@ -126,32 +126,41 @@ def guess_can_extract(b: bytes) -> bool:
 Entry = collections.namedtuple('Entry', ['name', 'size', 'mode', 'hash', 'text'])
 
 
+def handle_entry(entry: tarfile.TarInfo, tar: tarfile.TarFile, path: List[str]):
+    our_path = path + [os.path.normpath(entry.name)]
+
+    if not entry.isreg():
+        if not entry.isdir():
+            warn('irregular: {}//{}'.format(path, entry))
+        yield Entry(our_path, entry.size, entry.mode, None, False)
+        return
+
+        # returns different types if non-regular, but we know it's regular
+    r = tar.extractfile(entry)  # type: tarfile.ExFileObject
+
+    if not guess_can_extract(r.peek(64)):
+        digest, text = pack_into_temp_file(r)
+
+        yield Entry(our_path, entry.size, entry.mode, digest, text)
+        return
+
+    with tempfile.TemporaryFile() as tmp:
+        shutil.copyfileobj(r, tmp)
+        tmp.flush()
+        tmp.seek(0)
+        unpack(tmp, our_path)
+
+
 def unpack(fd: io.TextIOWrapper, path: List[str]):
     info('unpacking {}'.format(path))
     p = subprocess.Popen(['bsdtar', '-c', '-f', '-', '@-'], stdin=fd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     entries = []  # type: List[Entry]
-    with tarfile.open(mode='r|', fileobj=p.stdout) as tar:  # type: tarfile.TarFile
-        for entry in tar:  # type: tarfile.TarInfo
-            if not entry.isreg():
-                if not entry.isdir():
-                    warn('irregular: {}//{}'.format(path, entry))
-                continue
-
-            # returns different types if non-regular, but we know it's regular
-            r = tar.extractfile(entry)  # type: tarfile.ExFileObject
-            our_path = path + [os.path.normpath(entry.name)]
-
-            if not guess_can_extract(r.peek(64)):
-                digest, text = pack_into_temp_file(r)
-
-                entries.append(Entry(our_path, entry.size, entry.mode, digest, text))
-                continue
-
-            with tempfile.TemporaryFile() as tmp:
-                shutil.copyfileobj(r, tmp)
-                tmp.flush()
-                tmp.seek(0)
-                unpack(tmp, our_path)
+    try:
+        with tarfile.open(mode='r|', fileobj=p.stdout) as tar:  # type: tarfile.TarFile
+            for entry in tar:  # type: tarfile.TarInfo
+                entries.extend(handle_entry(entry, tar, path))
+    except tarfile.ReadError as e:
+        warn('bsdtar probably failed: {}'.format(e))
 
     if 0 != p.wait():
         warn('bsdtar failed')
