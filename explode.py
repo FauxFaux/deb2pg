@@ -19,6 +19,8 @@ except ImportError:
     pass
 
 OUTPUT_TO = os.path.join(os.getcwd(), 'packed')
+TEXT_DIR = os.path.join(OUTPUT_TO, 'text')
+BIN_DIR = os.path.join(OUTPUT_TO, 'bin')
 
 ARCHIVE_TYPES = {
     'application/java-archive',
@@ -198,7 +200,8 @@ def pack_into_temp_file(source: io.BufferedReader) -> Tuple[str, bool]:
             raise Exception("packing failed")
 
         digest = h.hexdigest()
-        os.rename(f.name, os.path.join(OUTPUT_TO, digest))
+        dest = os.path.join(TEXT_DIR if text else BIN_DIR, digest)
+        os.rename(f.name, dest)
         return digest, text
 
 
