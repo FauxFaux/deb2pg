@@ -34,7 +34,7 @@ def info(msg: Any):
 
 
 def warn(msg: Any):
-    sys.stderr.write("info: {}\n".format(msg))
+    sys.stderr.write("warn: {}\n".format(msg))
 
 
 MAGIC_COMPRESSED = magic.open(magic.MIME | magic.COMPRESS)
