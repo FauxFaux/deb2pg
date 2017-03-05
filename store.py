@@ -102,6 +102,7 @@ def main():
                 work.put(WorkItem(False, file))
             time.sleep(5)
     except KeyboardInterrupt as _:
+        print('shutting down...')
         pass
 
     for _ in range(threads):
