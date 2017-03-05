@@ -34,7 +34,11 @@ def decompose(hex_hash: str) -> Tuple[int, int, int, int]:
 def write(is_text: bool, hex_hash: str, conn: psycopg2.extensions.connection):
     path = os.path.join(TEXT_DIR if is_text else BIN_DIR, hex_hash)
     size = os.path.getsize(path)
-    h = decompose(hex_hash)
+    try:
+        h = decompose(hex_hash)
+    except ValueError as _:
+        # not a valid filename, ignore it
+        return
 
     with conn.cursor() as curr:  # type: psycopg2.extensions.cursor
 
@@ -51,13 +55,20 @@ RETURNING 1""", (size, *h))
             os.unlink(path)
             return
 
-        shard = '{}-{}'.format('text' if is_text else 'bin', min(9, max(2, int(math.log10(size)))))
+        shard_no = make_shard_no(size)
+        shard_name = '{}-{}'.format('text' if is_text else 'bin', shard_no)
+        shard_id = (shard_no - 2)
+        if not is_text:
+            shard_id += 8
+
         try:
-            pos = int(subprocess.check_output(['catfight', '-e', hex_hash, shard, path]).decode('utf-8'))
+            pos = int(subprocess.check_output(['catfight', '-e', hex_hash, shard_name, path]).decode('utf-8'))
         except subprocess.CalledProcessError as e:
             import sys
             sys.stderr.write(e.output)
             raise
+
+        pos += shard_id
 
         curr.execute("""
 UPDATE blob SET pos=%s WHERE len=%s AND h0=%s AND h1=%s AND h2=%s AND h3=%s
@@ -65,6 +76,22 @@ UPDATE blob SET pos=%s WHERE len=%s AND h0=%s AND h1=%s AND h2=%s AND h3=%s
 
     conn.commit()
     os.unlink(path)
+
+
+def make_shard_no(size):
+    """
+    >>> make_shard_no(2000)
+    3
+    >>> make_shard_no(900)
+    2
+    >>> make_shard_no(5)
+    2
+    >>> make_shard_no(1e6)
+    6
+    >>> make_shard_no(9e99)
+    9
+    """
+    return min(9, max(2, int(math.log10(size))))
 
 
 class Worker(threading.Thread):
