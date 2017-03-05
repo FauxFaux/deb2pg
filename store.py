@@ -5,8 +5,10 @@ import os
 import queue
 import subprocess
 import threading
+from typing import Optional
 from typing import Tuple
 
+import collections
 import psycopg2
 import time
 
@@ -14,6 +16,7 @@ INPUT_FROM = os.path.join(os.getcwd(), 'packed')
 TEXT_DIR = os.path.join(INPUT_FROM, 'text')
 BIN_DIR = os.path.join(INPUT_FROM, 'bin')
 
+WorkItem = collections.namedtuple('WorkItem', ['is_text', 'hex_hash'])
 
 
 def twos_complement(value: int, mask=2 ** 63) -> int:
@@ -72,22 +75,37 @@ class Worker(threading.Thread):
     def run(self):
         with psycopg2.connect('') as conn:
             while True:
-                struct = self.take_from.get()
-                write(struct[0], struct[1], conn)
+                struct = self.take_from.get()  # type: Optional[WorkItem]
+                if not struct:
+                    break
+                write(struct.is_text, struct.hex_hash, conn)
+
+
+def cores():
+    import multiprocessing
+    return multiprocessing.cpu_count()
 
 
 def main():
     work = queue.Queue(maxsize=100)
 
-    t = Worker(work)
-    t.start()
+    threads = cores() * 2
 
-    while True:
-        for file in os.listdir(TEXT_DIR):
-            work.put((True, file))
-        for file in os.listdir(BIN_DIR):
-            work.put((False, file))
-        time.sleep(5)
+    for _ in range(threads):
+        Worker(work).start()
+
+    try:
+        while True:
+            for file in os.listdir(TEXT_DIR):
+                work.put(WorkItem(True, file))
+            for file in os.listdir(BIN_DIR):
+                work.put(WorkItem(False, file))
+            time.sleep(5)
+    except KeyboardInterrupt as _:
+        pass
+
+    for _ in range(threads):
+        work.put(None)
 
 if '__main__' == __name__:
     main()
