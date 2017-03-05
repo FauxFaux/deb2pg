@@ -45,6 +45,7 @@ RETURNING 1""", (size, *h))
             # was hoping to get the position in the same statement,
             # but postgres doesn't work like that: returning only returns
             # modified rows
+            os.unlink(path)
             return
 
         shard = '{}-{}'.format('text' if is_text else 'bin', min(9, max(2, int(math.log10(size)))))
