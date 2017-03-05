@@ -1,16 +1,16 @@
 #!/usr/bin/python3
 
+import collections
 import math
 import os
 import queue
 import subprocess
 import threading
+import time
 from typing import Optional
 from typing import Tuple
 
-import collections
 import psycopg2
-import time
 
 INPUT_FROM = os.path.join(os.getcwd(), 'packed')
 TEXT_DIR = os.path.join(INPUT_FROM, 'text')
@@ -107,6 +107,7 @@ def main():
 
     for _ in range(threads):
         work.put(None)
+
 
 if '__main__' == __name__:
     main()
