@@ -5,16 +5,25 @@ import math
 import os
 import queue
 import subprocess
+import sys
 import threading
 import time
-from typing import Optional
-from typing import Tuple
+from typing import List, Tuple, Union
 
 import psycopg2
+
+
+def cores():
+    import multiprocessing
+    return multiprocessing.cpu_count()
+
+
+THREADS = cores() * 2
 
 INPUT_FROM = os.path.join(os.getcwd(), 'packed')
 TEXT_DIR = os.path.join(INPUT_FROM, 'text')
 BIN_DIR = os.path.join(INPUT_FROM, 'bin')
+MANIFEST_DIR = os.path.join(INPUT_FROM, 'manifests')
 
 WorkItem = collections.namedtuple('WorkItem', ['is_text', 'hex_hash'])
 
@@ -102,38 +111,101 @@ class Worker(threading.Thread):
     def run(self):
         with psycopg2.connect('') as conn:
             while True:
-                struct = self.take_from.get()  # type: Optional[WorkItem]
-                if not struct:
+                struct = self.take_from.get()  # type: Union[WorkItem, ShutDownLatch]
+                if isinstance(struct, ShutDownLatch):
+                    struct.im_done()
                     break
                 write(struct.is_text, struct.hex_hash, conn)
 
 
-def cores():
-    import multiprocessing
-    return multiprocessing.cpu_count()
+class WorkPool:
+    def __init__(self):
+        self.work = queue.Queue(maxsize=100)
+        self.workers = 0
+
+    def start(self):
+        self.workers += THREADS
+        for _ in range(THREADS):
+            Worker(self.work).start()
+
+    def stop(self):
+        latch = ShutDownLatch(self.workers)
+        for _ in range(self.workers):
+            self.work.put(latch)
+        latch.await()
+        self.workers = 0
+
+    def enqueue(self, item: WorkItem):
+        self.work.put(item)
+
+    def __enter__(self):
+        self.start()
+        return self
+
+    def __exit__(self, typ, value, traceback):
+        self.stop()
+
+
+class ShutDownLatch(object):
+    def __init__(self, count):
+        self.count = count
+        self.lock = threading.Condition()
+
+    def im_done(self):
+        with self.lock:
+            self.count -= 1
+            if self.count <= 0:
+                self.lock.notifyAll()
+
+    def await(self):
+        with self.lock:
+            while self.count > 0:
+                self.lock.wait()
+
+
+class ProcessPool:
+    def __init__(self):
+        self.procs = []  # type: List[subprocess.Popen]
+
+    def clean(self):
+        # TODO: rewrite using iterators or select or something
+        still_alive = []
+        for proc in self.procs:
+            try:
+                if 0 != proc.wait(timeout=1):
+                    raise Exception('subprocess failed: {}'.format(proc))
+            except subprocess.TimeoutExpired as _:
+                still_alive.append(proc)
+                pass
+        self.procs = still_alive
+
+    def too_many(self) -> bool:
+        self.clean()
+        return len(self.procs) > THREADS
+
+    def watch_over(self, proc: subprocess.Popen):
+        self.procs.append(proc)
 
 
 def main():
-    work = queue.Queue(maxsize=100)
-
-    threads = cores() * 2
-
-    for _ in range(threads):
-        Worker(work).start()
-
-    try:
-        while True:
+    pp = ProcessPool()
+    while True:
+        manifest = next((x for x in os.listdir(MANIFEST_DIR) if x.endswith('.manifest')), None)
+        with WorkPool() as pool:
             for file in os.listdir(TEXT_DIR):
-                work.put(WorkItem(True, file))
+                pool.enqueue(WorkItem(True, file))
             for file in os.listdir(BIN_DIR):
-                work.put(WorkItem(False, file))
-            time.sleep(5)
-    except KeyboardInterrupt as _:
-        print('shutting down...')
-        pass
+                pool.enqueue(WorkItem(False, file))
 
-    for _ in range(threads):
-        work.put(None)
+        if pp.too_many() or not manifest:
+            time.sleep(5)
+            continue
+
+        orig = os.path.join(MANIFEST_DIR, manifest)
+        taken = os.path.join(MANIFEST_DIR, manifest + '.working')
+        os.rename(orig, taken)
+
+        pp.watch_over(subprocess.Popen([sys.executable, 'write_manifest.py', taken]))
 
 
 if '__main__' == __name__:
