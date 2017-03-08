@@ -8,11 +8,11 @@ import shutil
 import subprocess
 import tarfile
 import tempfile
-from typing import Any, List, Tuple
+from typing import Any, List, Tuple, Iterator
 
 import magic
 
-from deb2pg import BIN_DIR, TEXT_DIR, MANIFEST_DIR
+from deb2pg import BIN_DIR, TEXT_DIR, MANIFEST_DIR, ROOT_DIR
 
 # for types only; actually using hashlib
 try:
@@ -126,7 +126,7 @@ def guess_can_extract(b: bytes) -> bool:
 Entry = collections.namedtuple('Entry', ['name', 'size', 'mode', 'hash', 'text'])
 
 
-def handle_entry(entry: tarfile.TarInfo, tar: tarfile.TarFile, path: List[str]):
+def handle_entry(entry: tarfile.TarInfo, tar: tarfile.TarFile, path: List[str]) -> Iterator[Entry]:
     our_path = path + [os.path.normpath(entry.name)]
 
     if not entry.isreg():
@@ -148,36 +148,30 @@ def handle_entry(entry: tarfile.TarInfo, tar: tarfile.TarFile, path: List[str]):
         shutil.copyfileobj(r, tmp)
         tmp.flush()
         tmp.seek(0)
-        unpack(tmp, our_path)
+        yield from unpack(tmp, our_path)
 
 
-def unpack(fd: io.TextIOWrapper, path: List[str]):
+def unpack(fd: io.BufferedReader, path: List[str]) -> Iterator[Entry]:
     info('unpacking {}'.format(path))
     p = subprocess.Popen(['bsdtar', '-c', '-f', '-', '@-'], stdin=fd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    entries = []  # type: List[Entry]
     try:
         with tarfile.open(mode='r|', fileobj=p.stdout) as tar:  # type: tarfile.TarFile
             for entry in tar:  # type: tarfile.TarInfo
-                entries.extend(handle_entry(entry, tar, path))
+                yield from handle_entry(entry, tar, path)
     except tarfile.ReadError as e:
         warn('bsdtar probably failed: {}'.format(e))
 
     if 0 != p.wait():
         warn('bsdtar failed')
-        return
-
-    for item in entries:
-        json.dump(item._asdict(), sys.stdout)
-        sys.stdout.write('\n')
 
 
 def pack_into_temp_file(source: io.BufferedReader) -> Tuple[str, bool]:
-    with ReNameableTemporaryFile(create_in=OUTPUT_TO) as f:
+    with ReNameableTemporaryFile(create_in=ROOT_DIR) as f:
         packer = subprocess.Popen(['lz4', '-5q', '-', f.name],
                                   stdin=subprocess.PIPE,
                                   stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE)
-        h = hashlib.sha256()  # type: SHA256.SHA256Hash
+        h = make_hash()
 
         text = True
         while True:
@@ -203,6 +197,10 @@ def pack_into_temp_file(source: io.BufferedReader) -> Tuple[str, bool]:
         return digest, text
 
 
+def make_hash() -> SHA256.SHA256Hash:
+    return hashlib.sha256()
+
+
 def is_text(buf: bytes) -> bool:
     """
     >>> is_text(b"\\0")
@@ -223,11 +221,27 @@ def is_text(buf: bytes) -> bool:
 
 
 def main(path):
-    with open(path) as f:
-        unpack(f, [path])
+    with open(path, 'rb') as f, \
+            ReNameableTemporaryFile(MANIFEST_DIR) as out, \
+            open(out.name, 'w') as outf:
+        for entry in unpack(f, [path]):
+            json.dump(entry._asdict(), outf)
+            outf.write('\n')
+        f.seek(0)
+
+        h = hash_file(f)
+
+        os.rename(out.name, os.path.join(MANIFEST_DIR, h + ".manifest"))
 
     info(ignored_mime_types)
     info(useless_miming)
+
+
+def hash_file(f: io.BufferedReader) -> str:
+    h = make_hash()
+    for chunk in iter(lambda: f.read(16 * 1024), b""):
+        h.update(chunk)
+    return h.hexdigest()
 
 
 if __name__ == '__main__':
