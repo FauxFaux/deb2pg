@@ -184,6 +184,10 @@ class ProcessPool:
         self.procs.append(proc)
 
 
+def helper_script(named: str) -> str:
+    return os.path.join(os.path.dirname(os.path.realpath(__path__)), named)
+
+
 def main():
     pp = ProcessPool()
     while True:
@@ -202,7 +206,7 @@ def main():
         taken = os.path.join(MANIFEST_DIR, manifest + '.working')
         os.rename(orig, taken)
 
-        pp.watch_over(subprocess.Popen([sys.executable, 'write_manifest.py', taken]))
+        pp.watch_over(subprocess.Popen([sys.executable, helper_script('write_manifest.py'), taken]))
 
 
 if '__main__' == __name__:

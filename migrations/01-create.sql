@@ -26,3 +26,7 @@ CREATE TABLE container (
   id   BIGSERIAL PRIMARY KEY,
   name VARCHAR NOT NULL
 );
+
+--migration
+
+CREATE UNIQUE INDEX ON path_component (path);

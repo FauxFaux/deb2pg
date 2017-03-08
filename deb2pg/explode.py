@@ -123,9 +123,6 @@ def guess_can_extract(b: bytes) -> bool:
     return False
 
 
-Entry = collections.namedtuple('Entry', ['name', 'size', 'mode', 'hash', 'text'])
-
-
 def handle_entry(entry: tarfile.TarInfo, tar: tarfile.TarFile, path: List[str]) -> Iterator[Entry]:
     our_path = path + [os.path.normpath(entry.name)]
 
