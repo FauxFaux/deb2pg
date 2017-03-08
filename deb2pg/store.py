@@ -12,6 +12,8 @@ from typing import List, Tuple, Union
 
 import psycopg2
 
+from deb2pg import BIN_DIR, TEXT_DIR, MANIFEST_DIR
+
 
 def cores():
     import multiprocessing
@@ -19,11 +21,6 @@ def cores():
 
 
 THREADS = cores() * 2
-
-INPUT_FROM = os.path.join(os.getcwd(), 'packed')
-TEXT_DIR = os.path.join(INPUT_FROM, 'text')
-BIN_DIR = os.path.join(INPUT_FROM, 'bin')
-MANIFEST_DIR = os.path.join(INPUT_FROM, 'manifests')
 
 WorkItem = collections.namedtuple('WorkItem', ['is_text', 'hex_hash'])
 

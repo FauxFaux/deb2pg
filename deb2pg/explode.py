@@ -12,15 +12,13 @@ from typing import Any, List, Tuple
 
 import magic
 
+from deb2pg import BIN_DIR, TEXT_DIR, MANIFEST_DIR
+
 # for types only; actually using hashlib
 try:
     from Crypto.Hash import SHA256
 except ImportError:
     pass
-
-OUTPUT_TO = os.path.join(os.getcwd(), 'packed')
-TEXT_DIR = os.path.join(OUTPUT_TO, 'text')
-BIN_DIR = os.path.join(OUTPUT_TO, 'bin')
 
 ARCHIVE_TYPES = {
     'application/java-archive',

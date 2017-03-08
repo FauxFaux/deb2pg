@@ -3,3 +3,7 @@
 .idea/
 fakedroot/
 __pycache__
+*.deb
+*.xz
+*.dsc
+packed/
