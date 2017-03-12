@@ -12,7 +12,7 @@ from typing import Any, List, Tuple, Iterator
 
 import magic
 
-from deb2pg import BIN_DIR, TEXT_DIR, MANIFEST_DIR, ROOT_DIR
+from deb2pg import BIN_DIR, TEXT_DIR, MANIFEST_DIR, ROOT_DIR, Entry
 
 # for types only; actually using hashlib
 try:
@@ -221,12 +221,18 @@ def main(path):
     with open(path, 'rb') as f, \
             ReNameableTemporaryFile(MANIFEST_DIR) as out, \
             open(out.name, 'w') as outf:
-        for entry in unpack(f, [path]):
-            json.dump(entry._asdict(), outf)
-            outf.write('\n')
-        f.seek(0)
 
         h = hash_file(f)
+        f.seek(0)
+        json.dump({
+            'name': os.path.basename(path),
+            'hash': h,
+        }, outf)
+        outf.write('\n')
+
+        for entry in unpack(f, []):
+            json.dump(entry._asdict(), outf)
+            outf.write('\n')
 
         os.rename(out.name, os.path.join(MANIFEST_DIR, h + ".manifest"))
 

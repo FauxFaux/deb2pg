@@ -1,11 +1,13 @@
 #!/usr/bin/python3
 import json
+import os
 import sys
-from typing import Dict, Iterator
+from typing import Dict, Iterator, Any, Tuple
 
 import psycopg2
 
 from deb2pg import Entry
+from deb2pg.store import decompose
 
 
 class StringPool:
@@ -35,17 +37,44 @@ SELECT id FROM path_component WHERE path=%s
                 return inserted[0]
 
 
-def load(path: str) -> Iterator[Entry]:
-    with open(path) as f:
-        for line in f.readlines():
-            yield Entry(**json.loads(line))
+def load(lines: Iterator[str]) -> Iterator[Entry]:
+    for line in lines:
+        yield Entry(**json.loads(line))
+
+
+def write_package(curr: psycopg2.extensions.cursor, details: Dict[str, Any]) -> int:
+    curr.execute("""
+INSERT INTO container (info) VALUES (%s) RETURNING id""", (json.dumps(details),))
+    return curr.fetchone()[0]
+
+
+def find_pos(
+        curr: psycopg2.extensions.cursor,
+        decomposed: Tuple[int, int, int, int]):
+    curr.execute("""
+SELECT pos FROM blob WHERE h0=%s AND h1=%s AND h2=%s AND h3=%s""",
+                 decomposed)
+    return curr.fetchone()[0]
 
 
 def main():
     sp = StringPool()
-    for entry in load(sys.argv[1]):
-        for item in entry.name:
-            sp.get(item)
+    manifest = sys.argv[1]
+    with open(manifest) as f, \
+            psycopg2.connect('') as conn, \
+            conn.cursor() as curr:  # type: psycopg2.extensions.cursor
+
+        lines = iter(f.readlines())
+        pkgid = write_package(curr, json.loads(next(lines)))
+
+        for entry in load(lines):
+            path = [sp.get(item) for item in entry.name]
+            pos = find_pos(curr, decompose(entry.hash))
+            curr.execute("""
+INSERT INTO file (container, pos, paths) VALUES (%s, %s, %s)""",
+                         (pkgid, pos, path))
+            # print(pkgid, path, entry.size, entry.mode, pos)
+    os.unlink(manifest)
 
 
 if '__main__' == __name__:

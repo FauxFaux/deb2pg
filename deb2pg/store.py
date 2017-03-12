@@ -185,7 +185,7 @@ class ProcessPool:
 
 
 def helper_script(named: str) -> str:
-    return os.path.join(os.path.dirname(os.path.realpath(__path__)), named)
+    return os.path.join(os.path.dirname(os.path.realpath(__file__)), named)
 
 
 def main():

@@ -12,7 +12,8 @@ CREATE TABLE blob (
 
 CREATE TABLE path_component (
   id   BIGSERIAL PRIMARY KEY,
-  path VARCHAR NOT NULL
+  path VARCHAR NOT NULL,
+  UNIQUE (path)
 );
 
 CREATE TABLE file (
@@ -23,10 +24,7 @@ CREATE TABLE file (
 );
 
 CREATE TABLE container (
-  id   BIGSERIAL PRIMARY KEY,
-  name VARCHAR NOT NULL
+  id       BIGSERIAL PRIMARY KEY,
+  ingested TIMESTAMPTZ NOT NULL DEFAULT now(),
+  info     JSONB       NOT NULL
 );
-
---migration
-
-CREATE UNIQUE INDEX ON path_component (path);
