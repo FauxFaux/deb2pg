@@ -50,7 +50,7 @@ def write(is_text: bool, hex_hash: str, conn: psycopg2.extensions.connection):
 
         curr.execute("""
 SELECT TRUE FROM blob WHERE h0=%s AND h1=%s AND h2=%s AND h3=%s
-""")
+""", h)
         if curr.fetchone():
             os.unlink(path)
             conn.rollback()
