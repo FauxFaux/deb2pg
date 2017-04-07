@@ -49,16 +49,32 @@ def write(is_text: bool, hex_hash: str, conn: psycopg2.extensions.connection):
     with conn.cursor() as curr:  # type: psycopg2.extensions.cursor
 
         curr.execute("""
-INSERT INTO blob (len, h0, h1, h2, h3)
-VALUES (%s, %s, %s, %s, %s)
-ON CONFLICT DO NOTHING
-RETURNING 1""", (size, *h))
-        if curr.fetchone() is None:
-            # we didn't insert the row, so no need to do anything
-            # was hoping to get the position in the same statement,
-            # but postgres doesn't work like that: returning only returns
-            # modified rows
+SELECT TRUE FROM blob WHERE h0=%s AND h1=%s AND h2=%s AND h3=%s
+""")
+        if curr.fetchone():
             os.unlink(path)
+            conn.rollback()
+            return
+
+        curr.execute("""
+SELECT pg_advisory_lock(18787)
+""")
+
+        curr.execute("""
+INSERT INTO blob (len, h0, h1, h2, h3)
+SELECT %s, %s, %s, %s, %s FROM blob
+WHERE NOT EXISTS (SELECT TRUE FROM blob WHERE h0=%s AND h1=%s AND h2=%s AND h3=%s)
+""", (size, *h, *h))
+        done = curr.rowcount
+
+        curr.execute("""
+SELECT pg_advisory_unlock(18787)
+""")
+
+        if done == 0:
+            # we didn't insert the row, so no need to do anything
+            os.unlink(path)
+            conn.rollback()
             return
 
         shard_no = make_shard_no(size)
