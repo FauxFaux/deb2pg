@@ -8,7 +8,7 @@ import subprocess
 import sys
 import threading
 import time
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Callable
 
 import psycopg2
 
@@ -178,15 +178,16 @@ class ShutDownLatch(object):
 
 class ProcessPool:
     def __init__(self):
-        self.procs = []  # type: List[subprocess.Popen]
+        self.procs = []  # type: List[Tuple[subprocess.Popen, Callable[[subprocess.Popen], None]]]
 
     def clean(self):
         # TODO: rewrite using iterators or select or something
         still_alive = []
-        for proc in self.procs:
+        for proc, when_done in self.procs:
             try:
                 if 0 != proc.wait(timeout=1):
                     raise Exception('subprocess failed: {}'.format(proc))
+                when_done(proc)
             except subprocess.TimeoutExpired as _:
                 still_alive.append(proc)
                 pass
@@ -196,8 +197,8 @@ class ProcessPool:
         self.clean()
         return len(self.procs) > THREADS
 
-    def watch_over(self, proc: subprocess.Popen):
-        self.procs.append(proc)
+    def watch_over(self, proc: subprocess.Popen, when_done: Callable[[subprocess.Popen], None]):
+        self.procs.append((proc, when_done))
 
 
 def helper_script(named: str) -> str:
@@ -222,7 +223,10 @@ def main():
         taken = os.path.join(MANIFEST_DIR, manifest + '.working')
         os.rename(orig, taken)
 
-        pp.watch_over(subprocess.Popen([sys.executable, helper_script('write_manifest.py'), taken]))
+        pp.watch_over(
+            subprocess.Popen([sys.executable, helper_script('write_manifest.py'), taken]),
+            lambda _: os.unlink(taken)
+        )
 
 
 if '__main__' == __name__:

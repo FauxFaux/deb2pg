@@ -172,8 +172,6 @@ def main():
 INSERT INTO file (container, pos, paths) VALUES (%s, %s, %s)""",
                          (pkgid, row[1], path))
 
-    os.unlink(manifest)
-
 
 if '__main__' == __name__:
     main()
