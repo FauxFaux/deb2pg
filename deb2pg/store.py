@@ -62,7 +62,7 @@ SELECT pg_advisory_lock(18787)
 
         curr.execute("""
 INSERT INTO blob (len, h0, h1, h2, h3)
-SELECT %s, %s, %s, %s, %s FROM blob
+SELECT %s, %s, %s, %s, %s
 WHERE NOT EXISTS (SELECT TRUE FROM blob WHERE h0=%s AND h1=%s AND h2=%s AND h3=%s)
 """, (size, *h, *h))
         done = curr.rowcount
