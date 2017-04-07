@@ -6,9 +6,10 @@ CREATE TABLE blob (
   h1  BIGINT NOT NULL,
   h2  BIGINT NOT NULL,
   h3  BIGINT NOT NULL,
-  pos BIGINT,
-  UNIQUE (h0, h1, h2, h3)
+  pos BIGINT
 );
+
+CREATE INDEX blob_h0_key ON blob (h0);
 
 CREATE TABLE path_component (
   id   BIGSERIAL PRIMARY KEY,
