@@ -5,10 +5,12 @@ import sys
 
 import os
 import psycopg2
-from typing import Dict, Iterator, Any, Tuple, Iterable, Union, List
+from typing import Dict, Iterator, Any, Tuple, Iterable, Union, List, TypeVar
 
 from deb2pg import Entry
 from deb2pg.store import decompose
+
+T = TypeVar('T')
 
 
 class StringPool:
@@ -109,11 +111,18 @@ def find_prefix(within: Iterable[str]) -> str:
     return prefix[0:slash + 1]
 
 
-def fixup_path(
+def strip_prefix(off_of: Dict[str, T]) -> Tuple[str, Dict[str, T]]:
+    prefix = find_prefix(off_of.keys())
+    if prefix:
+        off_of = {k[len(prefix):]: v for k, v in off_of.items()}
+    return prefix, off_of
+
+
+def fixup_path_internal(
         structure: Dict[str, Union[Dict, int]],
         so_far: List[str]) -> Iterator[Tuple[List[str], int]]:
     """
-    >>> list(fixup_path({'a': {'b/c': 3, 'b/d': 4}}, []))
+    >>> list(fixup_path_internal({'a': {'b/c': 3, 'b/d': 4}}, []))
     [(['a', 'b/', 'c'], 3), (['a', 'b/', 'd'], 4)]
     """
 
@@ -121,11 +130,21 @@ def fixup_path(
         if isinstance(sub, int):
             yield (so_far + [item], sub)
             continue
-        prefix = find_prefix(sub.keys())
-        if prefix:
-            sub = {k[len(prefix):]: v for k, v in sub.items()}
 
-        yield from fixup_path(sub, so_far + [item, prefix])
+        prefix, sub = strip_prefix(sub)
+
+        yield from fixup_path_internal(sub, so_far + [item, prefix])
+
+
+def fixup_path(structure: Dict[str, Union[Dict, int]]) \
+        -> Iterator[Tuple[List[str], int]]:
+    """
+    >>> list(fixup_path({'a/b': 3, 'a/c': 4}))
+    [(['a/', 'b'], 3), (['a/', 'c'], 4)]
+    """
+
+    prefix, sub = strip_prefix(structure)
+    yield from fixup_path_internal(sub, [prefix])
 
 
 def main():
@@ -146,7 +165,7 @@ def main():
                 ptr = ptr[item]
             ptr[last] = find_pos(curr, decompose(entry.hash))
 
-        for row in fixup_path(structure, []):
+        for row in fixup_path(structure):
             path = [sp.get(item) for item in row[0]]
 
             curr.execute("""
