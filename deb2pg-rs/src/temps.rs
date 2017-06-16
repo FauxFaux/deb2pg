@@ -1,12 +1,20 @@
-
 use std::fs;
 use std::io;
 
-use sha2::Digest;
+use base32;
+use ci_capnp;
+use thread_pool;
+use lz4;
+use num_cpus;
+use sha2;
+use tempfile;
+
+use errors::*;
 
 use std::ascii::AsciiExt;
 use std::io::Read;
 use std::io::Write;
+use sha2::Digest;
 
 fn tools() -> (
     sha2::Sha256,
@@ -64,11 +72,7 @@ fn to_bytes(slice: &[u8]) -> [u8; 256 / 8] {
 }
 
 
-fn main() {
-    let args = std::env::args().collect::<Vec<String>>();
-    assert_eq!(2, args.len());
-    let out_dir = args[1].to_string();
-
+fn read(out_dir: &String) -> Result<()> {
     {
         let alphabet_chars = "abcdefghijklmnopqrstuvwxyz234567";
         for first in alphabet_chars.chars() {
@@ -117,6 +121,7 @@ fn main() {
 
     pool.shutdown();
     pool.await_termination();
+    Ok(())
 }
 
 fn complete(temp: tempfile::NamedTempFile, hash: &[u8], out_dir: &str) {

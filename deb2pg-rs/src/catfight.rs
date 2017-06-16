@@ -1,5 +1,4 @@
 use std;
-use std::env;
 use std::io;
 use std::fs;
 use std::fs::File;
@@ -10,7 +9,10 @@ use copy::copy_file;
 
 use errors::*;
 
+use std::io::Seek;
+use std::io::Write;
 use std::os::unix::io::AsRawFd;
+
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 pub fn align(val: u64) -> u64 {
@@ -51,7 +53,7 @@ fn unarchive(root: &str, block_size: u64, offset: u64) -> Result<()> {
 fn flock(what: &File) -> Result<()> {
     let ret = unsafe { libc::flock(what.as_raw_fd(), libc::LOCK_EX) };
     if 0 != ret {
-        return Err(io::Error::last_os_error());
+        Err(Error::with_chain(io::Error::last_os_error(), "flocking"))
     } else {
         Ok(())
     }
@@ -60,7 +62,7 @@ fn flock(what: &File) -> Result<()> {
 fn unlock_flock(what: &File) -> Result<()> {
     let ret = unsafe { libc::flock(what.as_raw_fd(), libc::LOCK_UN) };
     if 0 != ret {
-        Err(io::Error::last_os_error())
+        Err(Error::with_chain(io::Error::last_os_error(), "un-flocking"))
     } else {
         Ok(())
     }
@@ -86,7 +88,7 @@ fn store(blocksize: u64, src_path: &str, dest_root: &str, extra: &String) -> Res
         }
 
         ensure!(0 == file_end % 16,
-            ErrorKind::InvalidState("unaligned file"));
+            ErrorKind::InvalidState(format!("unaligned file: {}", file_end)));
 
         if 0 == file_end {
             // we locked a new file, write a header
@@ -111,7 +113,7 @@ fn store(blocksize: u64, src_path: &str, dest_root: &str, extra: &String) -> Res
         return Ok(file_end);
     }
 
-    ErrorKind::InvalidState("ran out of files".to_string()).into()
+    Err(ErrorKind::InvalidState("ran out of files".to_string()).into())
 }
 
 #[cfg(never)]
