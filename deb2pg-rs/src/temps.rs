@@ -1,6 +1,9 @@
 use std::fs;
 use std::io;
 
+use std::sync::Arc;
+use std::sync::Mutex;
+
 use base32;
 use ci_capnp;
 use thread_pool;
@@ -71,8 +74,14 @@ fn to_bytes(slice: &[u8]) -> [u8; 256 / 8] {
     hash
 }
 
+#[derive(Debug)]
+pub struct TempFile {
+    pub header: ci_capnp::FileEntry,
+    pub len: u64,
+    pub name: String,
+}
 
-fn read(out_dir: &String) -> Result<()> {
+pub fn read(out_dir: &String) -> Result<(Vec<TempFile>)> {
     {
         let alphabet_chars = "abcdefghijklmnopqrstuvwxyz234567";
         for first in alphabet_chars.chars() {
@@ -81,6 +90,9 @@ fn read(out_dir: &String) -> Result<()> {
             }
         }
     }
+
+    let store: Vec<TempFile> = vec!();
+    let dest = Arc::new(Mutex::new(store));
 
     let (sender, pool) = thread_pool::Builder::new()
         .work_queue_capacity(num_cpus::get() * 2)
@@ -101,32 +113,45 @@ fn read(out_dir: &String) -> Result<()> {
             stdin.read_exact(&mut buf).expect("read");
 
             let out_dir = out_dir.clone();
+            let dest = dest.clone();
             sender.send(move || {
-
                 let hash = hash_compress_write_from_slice(&buf, &mut temp);
 
-                complete(temp, &hash, out_dir.as_str());
-
+                complete(en, temp, &hash, out_dir.as_str(), &dest);
             }).expect("offloading");
-
         } else {
-
             let file_data = (&mut stdin).take(en.len);
             let (total_read, hash) = hash_compress_write_from_reader(file_data, &mut temp);
             assert_eq!(en.len, total_read);
 
-            complete(temp, &hash, out_dir.as_str());
+            complete(en, temp, &hash, out_dir.as_str(), &dest);
         }
     }
 
     pool.shutdown();
     pool.await_termination();
-    Ok(())
+
+    Ok(Arc::try_unwrap(dest).unwrap().into_inner().unwrap())
 }
 
-fn complete(temp: tempfile::NamedTempFile, hash: &[u8], out_dir: &str) {
+fn complete(
+    en: ci_capnp::FileEntry,
+    temp: tempfile::NamedTempFile,
+    hash: &[u8],
+    out_dir: &str,
+    store: &Mutex<Vec<TempFile>>)
+    -> Result<()> {
     let mut encoded_hash = base32::encode(base32::Alphabet::RFC4648 { padding: false }, hash);
     encoded_hash.make_ascii_lowercase();
     let written_to = format!("{}/{}/1-{}.lz4", out_dir, &encoded_hash[0..2], &encoded_hash[2..]);
-    temp.persist(written_to).expect("rename");
+    let len = temp.metadata()?.len();
+
+    temp.persist(&written_to).expect("rename");
+
+    store.lock().unwrap().push(TempFile {
+        header: en,
+        len,
+        name: written_to,
+    });
+    Ok(())
 }
