@@ -19,6 +19,7 @@ use errors::*;
 
 fn run() -> Result<i32> {
     let temp_files = temps::read(&"t".to_string())?;
+
     for file in temp_files {
         println!("{}: {:?}", file.name, file.header.paths);
     }
