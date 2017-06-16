@@ -1,4 +1,4 @@
-extern crate libc;
+use libc;
 
 use std;
 use std::io;

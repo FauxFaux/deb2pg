@@ -1,11 +1,13 @@
 [package]
-name = "ci-splay"
+name = "deb2pg-rs"
 version = "0.1.0"
 authors = ["Chris West (Faux) <git@goeswhere.com>"]
 
 [dependencies]
 ci_capnp = { path = "../../contentin/ci_capnp" }
 base32 = "0.3.1"
+byteorder = "1.0.0"
+error-chain = "0.10.0"
 lz4 = "1.21.0"
 num_cpus = "1.5.1"
 sha2 = "0.6.0"
