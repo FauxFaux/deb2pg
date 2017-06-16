@@ -12,15 +12,13 @@ extern crate thread_pool;
 
 mod catfight;
 mod copy;
-mod simplify_path;
+//mod simplify_path;
 mod temps;
 
 use errors::*;
 
 fn run() -> Result<i32> {
     let temp_files = temps::read(&"t".to_string())?;
-    let all_paths = temp_files.iter().map(|f| f.header.paths.clone()).collect::<Vec<Vec<String>>>();
-    let simple_paths = simplify_path::simplify(all_paths);
     for file in temp_files {
         println!("{}: {:?}", file.name, file.header.paths);
     }

@@ -2,34 +2,34 @@ use std::collections::HashMap;
 use std::mem;
 
 use std::borrow::Borrow;
+use std::cell::Cell;
 use std::rc::Rc;
 
-#[derive(Debug)]
 enum Node {
-    Dir(HashMap<String, Rc<Node>>),
+    Dir(Cell<HashMap<String, Node>>),
     File(usize),
 }
 
 fn to_tree(input: Vec<Vec<String>>) -> HashMap<String, Node> {
-    let mut root = Rc::new(Node::Dir(HashMap::new()));
+    let mut root: HashMap<String, Node> = HashMap::new();
 
     for (idx, paths) in input.iter().enumerate() {
-        let mut curr = root;
+        let mut curr: Cell<HashMap<String, Node>> = &mut root;
+
         let mut paths = paths.clone();
         let last = paths.pop().unwrap();
         for path in paths {
-            if let &Node::Dir(ref mut map) = curr.borrow() {
-                curr = map.entry(path).or_insert_with(|| Rc::new(Node::Dir(HashMap::new()))).clone();
-            } else {
-                panic!("file is dir");
+            if !curr.contains_key(&path) {
+                curr.insert(path, Node::Dir(Cell::new(HashMap::new())));
             }
+
+            mem::replace(&mut curr, match curr[&path] {
+                Node::Dir(ref mut map) => map,
+                _ => unreachable!(),
+            });
         }
 
-        if let &Node::Dir(mut map) = curr.borrow() {
-            map.insert(last, Rc::new(Node::File(idx)));
-        } else {
-            panic!("file is dir");
-        }
+        curr.insert(last, Node::File(idx));
     }
 
     println!("{:?}", root);
