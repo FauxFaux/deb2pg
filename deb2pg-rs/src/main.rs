@@ -22,12 +22,20 @@ use std::collections::HashMap;
 use errors::*;
 
 fn run() -> Result<i32> {
-    let temp_files = temps::read(&"/var/ftmp/".to_string())?;
+    let temp_files = temps::read(&"/var/ftmp/t/".to_string())?;
 
     let conn = postgres::Connection::connect("postgres://faux@%2Frun%2Fpostgresql", postgres::TlsMode::None)?;
     let map = write_names(&conn, &temp_files.iter()
         .flat_map(|file| file.header.paths.iter())
         .collect::<Vec<&String>>());
+
+    for file in temp_files {
+        catfight::store(
+            1024 * 1024 * 1024,
+            file.name.as_str(),
+            "/var/ftmp/t/a",
+            &temps::encode_hash(&file.hash))?;
+    }
 
     Ok(0)
 }

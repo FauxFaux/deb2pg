@@ -29,7 +29,24 @@ fn tools() -> (
     )
 }
 
-fn hash_compress_write_from_slice<W>(buf: &[u8], to: W) -> [u8; 256 / 8]
+fn is_text(buf: &[u8]) -> bool {
+    for char in buf {
+        if 0 == *char // NUL
+            // ENQ (enquiry), ACK (acknowledge),
+            // \a (bell) and \b (backspace)
+            || (*char >= 5 && *char <= 8)
+            // SO, SI, DLE, DC?, NAK, SYN, ETB, CAN, EM, SUB, ESC (colour codes?),
+            // FS, GS, RS, US
+            || (*char >= 14 && *char < 32)
+            {
+                return false;
+            }
+    }
+
+    return true;
+}
+
+fn hash_compress_write_from_slice<W>(buf: &[u8], to: W) -> ([u8; 256 / 8], bool)
     where W: Write {
     let (mut hasher, lz4) = tools();
     let mut lz4 = lz4.build(to).expect("lz4 writer");
@@ -38,15 +55,16 @@ fn hash_compress_write_from_slice<W>(buf: &[u8], to: W) -> [u8; 256 / 8]
     lz4.write_all(buf).expect("lz4 writing");
     lz4.finish();
 
-    to_bytes(&hasher.result()[..])
+    (to_bytes(&hasher.result()[..]), is_text(buf))
 }
 
-fn hash_compress_write_from_reader<R, W>(mut from: R, to: W) -> (u64, [u8; 256 / 8])
+fn hash_compress_write_from_reader<R, W>(mut from: R, to: W) -> (u64, [u8; 256 / 8], bool)
     where W: Write,
           R: Read
 {
     let (mut hasher, lz4) = tools();
     let mut lz4 = lz4.build(to).expect("lz4 writer");
+    let mut text = true;
 
     let mut total_read = 0u64;
     loop {
@@ -61,11 +79,15 @@ fn hash_compress_write_from_reader<R, W>(mut from: R, to: W) -> (u64, [u8; 256 /
 
         hasher.input(&buf[0..read]);
         lz4.write_all(&buf[0..read]).expect("lz4 written");
+
+        if text {
+            text &= is_text(&buf[0..read]);
+        }
     }
     let (_, result) = lz4.finish();
     result.expect("lz4 finished");
 
-    (total_read, to_bytes(&hasher.result()[..]))
+    (total_read, to_bytes(&hasher.result()[..]), text)
 }
 
 fn to_bytes(slice: &[u8]) -> [u8; 256 / 8] {
@@ -78,6 +100,8 @@ fn to_bytes(slice: &[u8]) -> [u8; 256 / 8] {
 pub struct TempFile {
     pub header: ci_capnp::FileEntry,
     pub len: u64,
+    pub hash: [u8; 256 / 8],
+    pub text: bool,
     pub name: String,
 }
 
@@ -115,16 +139,16 @@ pub fn read(out_dir: &String) -> Result<(Vec<TempFile>)> {
             let out_dir = out_dir.clone();
             let dest = dest.clone();
             sender.send(move || {
-                let hash = hash_compress_write_from_slice(&buf, &mut temp);
+                let (hash, text) = hash_compress_write_from_slice(&buf, &mut temp);
 
-                complete(en, temp, &hash, out_dir.as_str(), &dest).unwrap();
+                complete(en, temp, hash, out_dir.as_str(), text, &dest).unwrap();
             }).expect("offloading");
         } else {
             let file_data = (&mut stdin).take(en.len);
-            let (total_read, hash) = hash_compress_write_from_reader(file_data, &mut temp);
+            let (total_read, hash, text) = hash_compress_write_from_reader(file_data, &mut temp);
             assert_eq!(en.len, total_read);
 
-            complete(en, temp, &hash, out_dir.as_str(), &dest)?;
+            complete(en, temp, hash, out_dir.as_str(), text, &dest)?;
         }
     }
 
@@ -137,12 +161,12 @@ pub fn read(out_dir: &String) -> Result<(Vec<TempFile>)> {
 fn complete(
     en: ci_capnp::FileEntry,
     temp: tempfile::NamedTempFile,
-    hash: &[u8],
+    hash: [u8; 256 / 8],
     out_dir: &str,
+    text: bool,
     store: &Mutex<Vec<TempFile>>)
     -> Result<()> {
-    let mut encoded_hash = base32::encode(base32::Alphabet::RFC4648 { padding: false }, hash);
-    encoded_hash.make_ascii_lowercase();
+    let encoded_hash = encode_hash(&hash);
     let written_to = format!("{}/{}/1-{}.lz4", out_dir, &encoded_hash[0..2], &encoded_hash[2..]);
     let len = temp.metadata()?.len();
 
@@ -152,6 +176,14 @@ fn complete(
         header: en,
         len,
         name: written_to,
+        hash,
+        text,
     });
     Ok(())
+}
+
+pub fn encode_hash(hash: &[u8]) -> String {
+    let mut encoded_hash = base32::encode(base32::Alphabet::RFC4648 { padding: false }, &hash);
+    encoded_hash.make_ascii_lowercase();
+    encoded_hash
 }
