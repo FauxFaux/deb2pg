@@ -99,13 +99,13 @@ fn to_bytes(slice: &[u8]) -> [u8; 256 / 8] {
 #[derive(Debug)]
 pub struct TempFile {
     pub header: ci_capnp::FileEntry,
-    pub len: u64,
+    pub packed_len: u64,
     pub hash: [u8; 256 / 8],
     pub text: bool,
     pub name: String,
 }
 
-pub fn read(out_dir: &String) -> Result<(Vec<TempFile>)> {
+pub fn read(out_dir: &str) -> Result<(Vec<TempFile>)> {
     {
         let alphabet_chars = "abcdefghijklmnopqrstuvwxyz234567";
         for first in alphabet_chars.chars() {
@@ -136,7 +136,7 @@ pub fn read(out_dir: &String) -> Result<(Vec<TempFile>)> {
             let mut buf = vec![0u8; en.len as usize];
             stdin.read_exact(&mut buf).expect("read");
 
-            let out_dir = out_dir.clone();
+            let out_dir = out_dir.to_string();
             let dest = dest.clone();
             sender.send(move || {
                 let (hash, text) = hash_compress_write_from_slice(&buf, &mut temp);
@@ -148,7 +148,7 @@ pub fn read(out_dir: &String) -> Result<(Vec<TempFile>)> {
             let (total_read, hash, text) = hash_compress_write_from_reader(file_data, &mut temp);
             assert_eq!(en.len, total_read);
 
-            complete(en, temp, hash, out_dir.as_str(), text, &dest)?;
+            complete(en, temp, hash, out_dir, text, &dest)?;
         }
     }
 
@@ -174,7 +174,7 @@ fn complete(
 
     store.lock().unwrap().push(TempFile {
         header: en,
-        len,
+        packed_len: len,
         name: written_to,
         hash,
         text,
