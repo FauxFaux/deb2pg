@@ -99,19 +99,19 @@ fn maybe_store(
     }
 
     // Otherwise, lock the db, and insert
-    curr.execute("
+    curr.prepare_cached("
 SELECT pg_advisory_lock(18787)
-", &[])?;
+")?.execute(&[])?;
 
-    let done = curr.execute("
+    let done = curr.prepare_cached("
 INSERT INTO blob (h0, h1, h2, h3, len)
 SELECT $1, $2, $3, $4, $5
 WHERE NOT EXISTS (SELECT TRUE FROM blob WHERE h0=$1 AND h1=$2 AND h2=$3 AND h3=$4 AND len=$5)
-", &[&h0, &h1, &h2, &h3, &size])?;
+")?.execute(&[&h0, &h1, &h2, &h3, &size])?;
 
-    curr.execute("
+    curr.prepare_cached("
 SELECT pg_advisory_unlock(18787)
-", &[])?;
+")?.execute(&[])?;
 
     if done == 0 {
         // we didn't insert the row, so no need to do anything
@@ -129,9 +129,9 @@ SELECT pg_advisory_unlock(18787)
         format!("{}/{}", shard_root, shard_name).as_str(),
         &temps::encode_hash(&file.hash))?;
 
-    curr.execute("
+    curr.prepare_cached("
 UPDATE blob SET pos=$1 WHERE h0=$2 AND h1=$3 AND h2=$4 AND h3=$5 AND len=$6
-", &[&(pos as i64), &h0, &h1, &h2, &h3, &size])?;
+")?.execute(&[&(pos as i64), &h0, &h1, &h2, &h3, &size])?;
 
     curr.commit()?;
     fs::remove_file(&file.name)?;
@@ -139,9 +139,11 @@ UPDATE blob SET pos=$1 WHERE h0=$2 AND h1=$3 AND h2=$4 AND h3=$5 AND len=$6
 }
 
 fn fetch(curr: &postgres::transaction::Transaction, h0: i64, h1: i64, h2: i64, h3: i64, len: i64) -> Result<Option<u64>> {
-    Ok(curr.query("
+    let statement = curr.prepare_cached("
 SELECT pos FROM blob WHERE h0=$1 AND h1=$2 AND h2=$3 AND h3=$4 AND len=$5
-", &[&h0, &h1, &h2, &h3, &len])?.iter().next().map(|row| row.get::<usize, i64>(0) as u64))
+")?;
+    let result = statement.query(&[&h0, &h1, &h2, &h3, &len])?;
+    Ok(result.iter().next().map(|row| row.get::<usize, i64>(0) as u64))
 }
 
 fn make_shard_no(size: u64) -> u8 {
