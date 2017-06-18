@@ -16,6 +16,7 @@ mod copy;
 //mod simplify_path;
 mod temps;
 
+use std::env;
 use std::fs;
 
 use std::collections::hash_map;
@@ -28,26 +29,56 @@ use temps::TempFile;
 use errors::*;
 
 fn run() -> Result<i32> {
+    assert_eq!(3, env::args().len());
+
+    // TODO: JSON injection
+    let package_name = env::args().nth(1).unwrap();
+    let package_version = env::args().nth(2).unwrap();
+
     let out_dir = "/var/ftmp/t/".to_string();
+    let container_info = format!("{{'type': 'debian', 'package': '{}', 'version': '{}'}}",
+                                 package_name, package_version);
 
     let temp_files = temps::read(out_dir.as_str())?;
 
-    let conn = postgres::Connection::connect("postgres://faux@%2Frun%2Fpostgresql", postgres::TlsMode::None)?;
-    let name_ids = write_names(&conn, &temp_files.iter()
+    let data_conn = connect()?;
+
+    let name_ids = write_names(&data_conn, &temp_files.iter()
         .flat_map(|file| file.header.paths.iter())
-        .collect::<Vec<&String>>());
+        .collect::<Vec<&String>>())?;
 
     let mut blobs = HashMap::with_capacity(temp_files.len());
+
+    let meta_conn = connect()?;
+    let meta_tran = meta_conn.transaction()?;
+
+    let container_id: i64 = meta_tran.query("
+INSERT INTO container (info) VALUES (to_jsonb($1::text)) RETURNING id
+", &[&container_info.to_string()]).chain_err(|| "inserting container info")?
+        .iter().next().unwrap().get(0);
 
     for file in temp_files {
         let pos: u64 = match blobs.entry(file.hash) {
             hash_map::Entry::Vacant(storable) =>
-                *storable.insert(maybe_store(out_dir.as_str(), &file, conn.transaction()?)?),
+                *storable.insert(maybe_store(out_dir.as_str(), &file, data_conn.transaction()?)?),
             hash_map::Entry::Occupied(occupied) => *occupied.get(),
         };
+
+        let path = file.header.paths.iter().map(|part| name_ids[part]).collect::<Vec<i64>>();
+        meta_tran.execute("
+INSERT INTO file (container, pos, paths) VALUES ($1, $2, $3)
+", &[&container_id, &(pos as i64), &path])?;
+
     }
 
+    meta_tran.commit()?;
+
     Ok(0)
+}
+
+fn connect() -> Result<postgres::Connection> {
+    postgres::Connection::connect("postgres://faux@%2Frun%2Fpostgresql", postgres::TlsMode::None)
+        .chain_err(|| "connecting to postgres")
 }
 
 /// Store the supplied `TempFile` in the appropriate shard in the `shard_root`,
@@ -74,9 +105,9 @@ SELECT pg_advisory_lock(18787)
 
     let done = curr.execute("
 INSERT INTO blob (h0, h1, h2, h3, len)
-SELECT %s, %s, %s, %s, %s
-WHERE NOT EXISTS (SELECT TRUE FROM blob WHERE h0=%s AND h1=%s AND h2=%s AND h3=%s AND len=%s)
-", &[&h0, &h1, &h2, &h3, &size, &h0, &h1, &h2, &h3, &size])?;
+SELECT $1, $2, $3, $4, $5
+WHERE NOT EXISTS (SELECT TRUE FROM blob WHERE h0=$1 AND h1=$2 AND h2=$3 AND h3=$4 AND len=$5)
+", &[&h0, &h1, &h2, &h3, &size])?;
 
     curr.execute("
 SELECT pg_advisory_unlock(18787)
@@ -99,7 +130,7 @@ SELECT pg_advisory_unlock(18787)
         &temps::encode_hash(&file.hash))?;
 
     curr.execute("
-UPDATE blob SET pos=%s WHERE h0=%s AND h1=%s AND h2=%s AND h3=%s AND len=%s
+UPDATE blob SET pos=$1 WHERE h0=$2 AND h1=$3 AND h2=$4 AND h3=$5 AND len=$6
 ", &[&(pos as i64), &h0, &h1, &h2, &h3, &size])?;
 
     curr.commit()?;
@@ -109,7 +140,7 @@ UPDATE blob SET pos=%s WHERE h0=%s AND h1=%s AND h2=%s AND h3=%s AND len=%s
 
 fn fetch(curr: &postgres::transaction::Transaction, h0: i64, h1: i64, h2: i64, h3: i64, len: i64) -> Result<Option<u64>> {
     Ok(curr.query("
-SELECT pos FROM blob WHERE h0=%s AND h1=%s AND h2=%s AND h3=%s AND len=%s
+SELECT pos FROM blob WHERE h0=$1 AND h1=$2 AND h2=$3 AND h3=$4 AND len=$5
 ", &[&h0, &h1, &h2, &h3, &len])?.iter().next().map(|row| row.get::<usize, i64>(0) as u64))
 }
 
