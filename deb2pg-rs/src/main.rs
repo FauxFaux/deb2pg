@@ -57,6 +57,9 @@ INSERT INTO container (info) VALUES (to_jsonb($1::text)) RETURNING id
 ", &[&container_info.to_string()]).chain_err(|| "inserting container info")?
         .iter().next().unwrap().get(0);
 
+    let insert_file = meta_tran.prepare("
+INSERT INTO file (container, pos, paths) VALUES ($1, $2, $3)
+")?;
     for file in temp_files {
         let pos: u64 = match blobs.entry(file.hash) {
             hash_map::Entry::Vacant(storable) =>
@@ -65,10 +68,7 @@ INSERT INTO container (info) VALUES (to_jsonb($1::text)) RETURNING id
         };
 
         let path = file.header.paths.iter().map(|part| name_ids[part]).collect::<Vec<i64>>();
-        meta_tran.execute("
-INSERT INTO file (container, pos, paths) VALUES ($1, $2, $3)
-", &[&container_id, &(pos as i64), &path])?;
-
+        insert_file.execute(&[&container_id, &(pos as i64), &path])?;
     }
 
     meta_tran.commit()?;
