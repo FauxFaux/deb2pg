@@ -122,6 +122,8 @@ pub fn read(out_dir: &str) -> Result<(Vec<TempFile>)> {
         .work_queue_capacity(num_cpus::get() * 2)
         .build();
 
+    let mut pool_used = false;
+
     let mut stdin = io::stdin();
     while let Some(en) = ci_capnp::read_entry(&mut stdin).expect("capnp") {
         if 0 == en.len {
@@ -143,6 +145,7 @@ pub fn read(out_dir: &str) -> Result<(Vec<TempFile>)> {
 
                 complete(en, temp, hash, out_dir.as_str(), text, &dest).unwrap();
             }).expect("offloading");
+            pool_used = true;
         } else {
             let file_data = (&mut stdin).take(en.len);
             let (total_read, hash, text) = hash_compress_write_from_reader(file_data, &mut temp);
@@ -153,7 +156,11 @@ pub fn read(out_dir: &str) -> Result<(Vec<TempFile>)> {
     }
 
     pool.shutdown();
-    pool.await_termination();
+
+    // This deadlocks if the pool has never been used: https://github.com/carllerche/thread-pool/issues/5
+    if pool_used {
+        pool.await_termination();
+    }
 
     Ok(Arc::try_unwrap(dest).unwrap().into_inner().unwrap())
 }
