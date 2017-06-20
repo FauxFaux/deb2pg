@@ -7,7 +7,7 @@ use std::collections::hash_map;
 #[derive(Debug)]
 enum Node {
     Dir(HashMap<String, Node>),
-    File
+    File(usize)
 }
 
 ///    >>> shortest_match("foo", "bar")
@@ -78,7 +78,7 @@ fn strip_prefix<T>(off_of: HashMap<String, T>) -> (String, HashMap<String, T>) {
 
 fn fixup_path_internal(
         structure: HashMap<String, Node>,
-        so_far: &[String]) -> Vec<(Vec<String>, Node)> {
+        so_far: &[String]) -> Vec<(Vec<String>, usize)> {
 //    >>> list(fixup_path_internal({'a': {'b/c': 3, 'b/d': 4}}, []))
 //    [(['a', 'b/', 'c'], 3), (['a', 'b/', 'd'], 4)]
 
@@ -89,9 +89,9 @@ fn fixup_path_internal(
         let mut next: Vec<String> = so_far.iter().map(|s| s.to_string()).collect();
 
         match sub {
-            Node::File => {
+            Node::File(pos) => {
                 next.push(item);
-                ret.push((next, sub))
+                ret.push((next, pos))
             },
             Node::Dir(sub) => {
                 let (prefix, sub) = strip_prefix(sub);
@@ -109,7 +109,7 @@ fn fixup_path_internal(
 
 
 fn fixup_path(structure: HashMap<String, Node>)
-        -> Vec<(Vec<String>, Node)> {
+        -> Vec<(Vec<String>, usize)> {
 //    >>> list(fixup_path({'a/b': 3, 'a/c': 4}))
 //    [(['a/', 'b'], 3), (['a/', 'c'], 4)]
 
@@ -120,24 +120,26 @@ fn fixup_path(structure: HashMap<String, Node>)
 
 pub fn simplify(input: Vec<Vec<String>>) -> Vec<Vec<String>> {
     let tree = list_to_tree(input);
-    fixup_path(tree).iter().map(|x| x.0.clone()).collect()
+    let mut fixed = fixup_path(tree);
+    fixed.sort_by_key(|x| x.1);
+    fixed.into_iter().map(|x| x.0).collect()
 }
 
 
-fn add(into: &mut HashMap<String, Node>, remaining: &[String]) {
+fn add(into: &mut HashMap<String, Node>, remaining: &[String], pos: usize) {
     match remaining.len() {
         0 => unreachable!(),
-        1 => { into.insert(remaining[0].to_string(), Node::File); }
+        1 => { into.insert(remaining[0].to_string(), Node::File(pos)); }
         _ => {
             match into.entry(remaining[0].to_string()) {
                 hash_map::Entry::Occupied(mut exists) => {
                     if let &mut Node::Dir(ref mut map) = exists.get_mut() {
-                        add(map, &remaining[1..]);
+                        add(map, &remaining[1..], pos);
                     }
                 }
                 hash_map::Entry::Vacant(vacant) => {
                     let mut map = HashMap::new();
-                    add(&mut map, &remaining[1..]);
+                    add(&mut map, &remaining[1..], pos);
                     vacant.insert(Node::Dir(map));
                 }
             }
@@ -147,8 +149,8 @@ fn add(into: &mut HashMap<String, Node>, remaining: &[String]) {
 
 fn list_to_tree(from: Vec<Vec<String>>) -> HashMap<String, Node> {
     let mut root = HashMap::new();
-    for item in from {
-        add(&mut root, &item);
+    for (pos, item) in from.into_iter().enumerate() {
+        add(&mut root, &item, pos);
     }
     root
 }
