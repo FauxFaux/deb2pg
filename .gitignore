@@ -6,7 +6,6 @@ __pycache__
 *.deb
 *.xz
 *.dsc
-packed/
 bin-?.*
 text-?.*
 out
