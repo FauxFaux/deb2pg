@@ -1,50 +1,156 @@
 use std::cmp;
-use std::mem;
 
 use std::collections::HashMap;
 
-pub fn simplify(mut input: Vec<Vec<String>>) -> Vec<Vec<String>> {
-    input.sort_by(|left, right| {
-        for i in 0..cmp::min(left.len(), right.len()) {
-            match left[i].cmp(&right[i]) {
-                cmp::Ordering::Equal => continue,
-                otherwise => return otherwise,
-            };
-        }
+use std::collections::hash_map;
 
-        left.len().cmp(&right.len())
-    });
-
-    // a b/c d
-    // a b/c e
-    // g
-
-    let mut previous = None;
-
-//    let mut prefix: HashMap<Vec<String>, String> = HashMap::new();
-
-    // first pass
-    for paths in &input {
-        if previous.is_none() {
-            previous = Some(paths);
-            continue;
-        }
-
-        let previous = previous.as_ref().unwrap();
-    }
-
-    input.clone()
+#[derive(Debug)]
+enum Node {
+    Dir(HashMap<String, Node>),
+    File
 }
 
-fn diff_point<T: PartialEq>(left: &[T], right: &[T]) -> usize {
+///    >>> shortest_match("foo", "bar")
+///    ''
+///    >>> shortest_match("foo", "food")
+///    'foo'
+///    >>> shortest_match("abcd", "abfd")
+///    'ab'
+fn shortest_match(left: &str, right: &str) -> String {
+    let left: Vec<char> = left.chars().collect();
+    let right: Vec<char> = right.chars().collect();
     let shortest = cmp::min(left.len(), right.len());
-    for i in 0..shortest {
+    let mut i = 0;
+
+    while i < shortest {
         if left[i] != right[i] {
-            return i;
+            break;
+        }
+
+        i += 1;
+    }
+
+    (&left[0..i]).iter().collect()
+}
+
+///    >>> find_prefix(["foo/bar", "foo/baz"])
+///    'foo/'
+///    >>> find_prefix([])
+///    ''
+///    >>> find_prefix(['one/two'])
+///    'one/'
+///    >>> find_prefix(['one/two', 'one'])
+///    ''
+///    >>> find_prefix(['one/two', 'two'])
+///    ''
+fn find_prefix(within: Vec<String>) -> String {
+
+    let mut it = within.iter();
+    let empty_string = "".to_string();
+    let mut prefix: String = it.next().unwrap_or(&empty_string).to_string();
+    for item in it {
+        if item.starts_with(prefix.as_str()) {
+            continue
+        }
+        prefix = shortest_match(prefix.as_str(), item);
+    }
+
+    match prefix.rfind('/') {
+        None => "",
+        Some(slash) => &prefix[0..slash + 1],
+    }.to_string()
+}
+
+fn strip_prefix<T>(off_of: HashMap<String, T>) -> (String, HashMap<String, T>) {
+    let prefix = find_prefix(off_of.keys().map(|s| s.to_string()).collect());
+
+    if prefix.is_empty() {
+        (prefix, off_of)
+    } else {
+        let mut new_val = HashMap::with_capacity(off_of.len());
+        for (k, v) in off_of {
+            new_val.insert((&k[prefix.len()..]).to_string(), v);
+        }
+        (prefix, new_val)
+    }
+}
+
+
+fn fixup_path_internal(
+        structure: HashMap<String, Node>,
+        so_far: &[String]) -> Vec<(Vec<String>, Node)> {
+//    >>> list(fixup_path_internal({'a': {'b/c': 3, 'b/d': 4}}, []))
+//    [(['a', 'b/', 'c'], 3), (['a', 'b/', 'd'], 4)]
+
+    let mut ret = Vec::new();
+
+
+    for (item, sub) in structure {
+        let mut next: Vec<String> = so_far.iter().map(|s| s.to_string()).collect();
+
+        match sub {
+            Node::File => {
+                next.push(item);
+                ret.push((next, sub))
+            },
+            Node::Dir(sub) => {
+                let (prefix, sub) = strip_prefix(sub);
+                next.push(item);
+                next.push(prefix);
+                for value in fixup_path_internal(sub, &next) {
+                    ret.push(value);
+                }
+            }
         }
     }
 
-    shortest
+    ret
+}
+
+
+fn fixup_path(structure: HashMap<String, Node>)
+        -> Vec<(Vec<String>, Node)> {
+//    >>> list(fixup_path({'a/b': 3, 'a/c': 4}))
+//    [(['a/', 'b'], 3), (['a/', 'c'], 4)]
+
+    let (prefix, sub) = strip_prefix(structure);
+    fixup_path_internal(sub, &[prefix.to_string()])
+}
+
+
+pub fn simplify(input: Vec<Vec<String>>) -> Vec<Vec<String>> {
+    let tree = list_to_tree(input);
+    fixup_path(tree).iter().map(|x| x.0.clone()).collect()
+}
+
+
+fn add(into: &mut HashMap<String, Node>, remaining: &[String]) {
+    match remaining.len() {
+        0 => unreachable!(),
+        1 => { into.insert(remaining[0].to_string(), Node::File); }
+        _ => {
+            match into.entry(remaining[0].to_string()) {
+                hash_map::Entry::Occupied(mut exists) => {
+                    if let &mut Node::Dir(ref mut map) = exists.get_mut() {
+                        add(map, &remaining[1..]);
+                    }
+                }
+                hash_map::Entry::Vacant(vacant) => {
+                    let mut map = HashMap::new();
+                    add(&mut map, &remaining[1..]);
+                    vacant.insert(Node::Dir(map));
+                }
+            }
+        }
+    }
+}
+
+fn list_to_tree(from: Vec<Vec<String>>) -> HashMap<String, Node> {
+    let mut root = HashMap::new();
+    for item in from {
+        add(&mut root, &item);
+    }
+    root
 }
 
 #[cfg(test)]
@@ -78,15 +184,6 @@ mod tests {
         ])) {
             println!("{:?}", out);
         }
-    }
-
-    #[test]
-    fn diff() {
-        assert_eq!(2, diff_point(&[1, 2, 3], &[1, 2, 4]));
-        assert_eq!(0, diff_point(&[1, 2, 3], &[5, 6]));
-        assert_eq!(2, diff_point(&[1, 2, 3], &[1, 2]));
-        assert_eq!(1, diff_point(&[1, 2, 3], &[1]));
-        assert_eq!(3, diff_point(&[1, 2, 3], &[1, 2, 3]));
     }
 
     fn to_vec(what: &[&[&str]]) -> Vec<Vec<String>> {

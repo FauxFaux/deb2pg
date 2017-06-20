@@ -13,7 +13,7 @@ extern crate thread_pool;
 
 mod catfight;
 mod copy;
-//mod simplify_path;
+mod simplify_path;
 mod temps;
 
 use std::env;
