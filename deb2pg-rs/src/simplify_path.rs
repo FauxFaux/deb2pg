@@ -69,7 +69,9 @@ fn strip_prefix<T>(off_of: HashMap<String, T>) -> (String, HashMap<String, T>) {
     } else {
         let mut new_val = HashMap::with_capacity(off_of.len());
         for (k, v) in off_of {
-            new_val.insert((&k[prefix.len()..]).to_string(), v);
+            if k != prefix {
+                new_val.insert((&k[prefix.len()..]).to_string(), v);
+            }
         }
         (prefix, new_val)
     }
@@ -96,7 +98,9 @@ fn fixup_path_internal(
             Node::Dir(sub) => {
                 let (prefix, sub) = strip_prefix(sub);
                 next.push(item);
-                next.push(prefix);
+                if !prefix.is_empty() {
+                    next.push(prefix);
+                }
                 for value in fixup_path_internal(sub, &next) {
                     ret.push(value);
                 }
@@ -114,7 +118,11 @@ fn fixup_path(structure: HashMap<String, Node>)
 //    [(['a/', 'b'], 3), (['a/', 'c'], 4)]
 
     let (prefix, sub) = strip_prefix(structure);
-    fixup_path_internal(sub, &[prefix.to_string()])
+    if prefix.is_empty() {
+        fixup_path_internal(sub, &[])
+    } else {
+        fixup_path_internal(sub, &[prefix.to_string()])
+    }
 }
 
 
