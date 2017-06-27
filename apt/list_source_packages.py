@@ -3,9 +3,9 @@
 import collections
 
 import apt
-import apt_pkg
 
 cache = apt.cache.Cache(rootdir='fakedroot')
+
 
 def versions_in(suite):
     source_versions = collections.defaultdict(set)
@@ -22,9 +22,9 @@ def versions_in(suite):
 
 if '__main__' == __name__:
     import sys
+
     sources = versions_in(sys.argv[1] if len(sys.argv) > 1 else None)
     for src in sorted(sources.keys()):
         # sort lexographically for determinism, not for any other reason
         for ver in sorted(sources[src]):
             print('{}={}'.format(src, ver))
-
