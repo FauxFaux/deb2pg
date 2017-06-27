@@ -1,35 +1,25 @@
-#![feature(decode_utf8)]
-#![feature(io)]
-
-extern crate argparse;
-extern crate bit_set;
-extern crate byteorder;
-extern crate compress;
-extern crate libc;
-
+use std;
 use std::fs;
 use std::io;
 use std::mem;
 use std::path;
 use std::slice;
 
-use argparse::{Store, StoreTrue};
-
 use bit_set::BitSet;
 
 use byteorder::{BigEndian, ReadBytesExt};
 
-use compress::lz4;
-
+use libc;
 use libc::c_void;
+
+use lz4;
 
 //magic:
 use std::io::Read;
 use std::io::Seek;
 use std::os::unix::io::AsRawFd;
 
-mod tri;
-
+use tri;
 
 static TRI_MAX: usize = 64 * 64 * 64;
 
@@ -221,7 +211,7 @@ fn eat_chunk(mut fh: &mut fs::File) -> io::Result<BitSet> {
     let extra_len = fh.read_u64::<BigEndian>()?;
     let start = fh.seek(io::SeekFrom::Current(extra_len as i64))?;
     let ret = {
-        let decoder = lz4::Decoder::new(&mut fh);
+        let decoder = lz4::Decoder::new(&mut fh)?;
         let range = decoder.bytes();
         let exploding = range.map(|x| x.unwrap());
         let decoder = std::char::decode_utf8(exploding);
@@ -233,30 +223,10 @@ fn eat_chunk(mut fh: &mut fs::File) -> io::Result<BitSet> {
     ret
 }
 
-fn main() {
+fn index() {
     let mut from: String = "".to_string();
     let mut simple = false;
     let mut addendum: u64 = 0;
-    {
-        let mut ap = argparse::ArgumentParser::new();
-        ap.set_description("totally not a load of tools glued together");
-        ap.refer(&mut from).required().add_option(
-            &["-f", "--input-file"],
-            Store,
-            "pack file to read",
-        );
-        ap.refer(&mut addendum).add_option(
-            &["-i", "--addendum"],
-            Store,
-            "number to add to file offset",
-        );
-        ap.refer(&mut simple).add_option(
-            &["--simple"],
-            StoreTrue,
-            "not a pack, just a normal decompressed file",
-        );
-        ap.parse_args_or_exit();
-    }
 
     let mut idx = Index::new().unwrap();
 

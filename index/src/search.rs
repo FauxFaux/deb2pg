@@ -1,7 +1,3 @@
-#![feature(io)]
-extern crate bit_set;
-extern crate regex_syntax;
-
 use std::env;
 use std::fmt;
 use std::io;
@@ -10,7 +6,7 @@ use regex_syntax::Expr;
 
 type Tri = u32;
 
-mod tri;
+use tri;
 
 #[derive(PartialEq, Eq, Hash, Debug)]
 enum Op {
