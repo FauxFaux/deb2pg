@@ -33,16 +33,13 @@ fn shortest_match(left: &str, right: &str) -> String {
     (&left[0..i]).iter().collect()
 }
 
-///    >>> find_prefix(["foo/bar", "foo/baz"])
-///    'foo/'
-///    >>> find_prefix([])
-///    ''
-///    >>> find_prefix(['one/two'])
-///    'one/'
-///    >>> find_prefix(['one/two', 'one'])
-///    ''
-///    >>> find_prefix(['one/two', 'two'])
-///    ''
+/// ```
+/// assert_eq!("foo/", find_prefix(["foo/bar", "foo/baz"]));
+/// assert_eq!("", find_prefix([]));
+/// assert_eq!("one/", find_prefix(['one/two']));
+/// assert_eq!("", find_prefix(['one/two', 'one']));
+/// assert_eq!("", find_prefix(['one/two', 'two']));
+/// ```
 fn find_prefix<'a, I>(mut it: I) -> String
 where I: Iterator<Item=&'a String> {
     let empty_string = String::new();
