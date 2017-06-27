@@ -43,6 +43,8 @@ fn hello_world() {
 
         assert_eq!(b"world", record.extra.as_slice());
         assert_eq!(b"hello", into.as_slice());
+
+        record.complete().unwrap();
     }
 
     assert!(catfight::read_record(&mut archive).unwrap().is_none())

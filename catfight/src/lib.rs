@@ -1,8 +1,3 @@
-// Expecting this to be stabilised really soon,
-// and significantly simplifies the implementation of Drop.
-// Totally possible to re-write in terms of into_inner(), I think.
-#![feature(more_io_inner_methods)]
-
 extern crate byteorder;
 #[macro_use]
 extern crate error_chain;

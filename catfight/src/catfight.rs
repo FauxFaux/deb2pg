@@ -29,21 +29,13 @@ fn unarchive(root: &str, block_size: u64, offset: u64) -> Result<()> {
     let mut fd = File::open(target_path)?;
 
     fd.seek(io::SeekFrom::Start(target_file_offset))?;
-    let mut record_option = read_record(&mut fd)?;
-    match record_option {
-        Some(Record {
-                 ref mut reader,
-                 extra: _,
-                 realign: _,
-             }) => {
-            io::copy(reader, &mut io::stdout())?;
-            Ok(())
-        }
-        None => {
-            bail!(ErrorKind::InvalidState(
-                "read appears to be past the end of the file".to_string(),
-            ))
-        }
+    if let Some(mut record) = read_record(&mut fd)? {
+        io::copy(&mut record.reader, &mut io::stdout())?;
+        record.complete()
+    } else {
+        bail!(ErrorKind::InvalidState(
+            "read appears to be past the end of the file".to_string(),
+        ))
     }
 }
 
@@ -56,15 +48,23 @@ where
     realign: u8,
 }
 
-impl<'a, R> Drop for Record<'a, R>
+impl<'a, R> Record<'a, R>
 where
     R: std::io::Read,
 {
-    fn drop(&mut self) {
+    /// Assuming the reader has been consumed, realign us with where the next record should be.
+    pub fn complete(mut self) -> Result<()> {
         let mut buf = vec![0u8; self.realign as usize];
-        self.reader.get_mut().read_exact(&mut buf).expect(
-            "realigning",
-        );
+        let mut byte = [0u8, 1];
+        if 0 != self.reader.read(&mut byte)? {
+            bail!(ErrorKind::InvalidState(
+                "can't complete until the 'reader' has been fully read"
+                    .to_string(),
+            ));
+        }
+
+        self.reader.into_inner().read_exact(&mut buf)?;
+        Ok(())
     }
 }
 
