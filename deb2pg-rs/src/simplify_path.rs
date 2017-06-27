@@ -126,7 +126,7 @@ fn fixup_path(structure: HashMap<String, Node>)
 }
 
 
-pub fn simplify(input: Vec<Vec<String>>) -> Vec<Vec<String>> {
+pub fn simplify(input: Vec<Vec<&String>>) -> Vec<Vec<String>> {
     let tree = list_to_tree(input);
     let mut fixed = fixup_path(tree);
     fixed.sort_by_key(|x| x.1);
@@ -134,7 +134,7 @@ pub fn simplify(input: Vec<Vec<String>>) -> Vec<Vec<String>> {
 }
 
 
-fn add(into: &mut HashMap<String, Node>, remaining: &[String], pos: usize) {
+fn add(into: &mut HashMap<String, Node>, remaining: &[&String], pos: usize) {
     match remaining.len() {
         0 => unreachable!(),
         1 => { into.insert(remaining[0].to_string(), Node::File(pos)); }
@@ -155,7 +155,7 @@ fn add(into: &mut HashMap<String, Node>, remaining: &[String], pos: usize) {
     }
 }
 
-fn list_to_tree(from: Vec<Vec<String>>) -> HashMap<String, Node> {
+fn list_to_tree(from: Vec<Vec<&String>>) -> HashMap<String, Node> {
     let mut root = HashMap::new();
     for (pos, item) in from.into_iter().enumerate() {
         add(&mut root, &item, pos);
