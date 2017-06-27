@@ -169,7 +169,7 @@ mod tests {
 
     fn assert_identity(of: &[&[&str]]) {
         let val = to_vec(of);
-        assert_eq!(val, simplify(val.clone()))
+        assert_eq!(val, simplify(refify(&val.clone())))
     }
 
     #[test]
@@ -183,7 +183,7 @@ mod tests {
 
     #[test]
     fn trial() {
-        for out in simplify(to_vec(&[
+        for out in simplify(refify(&to_vec(&[
             &["some.dsc"],
             &["foo.tar", "foo-1337/"],
             &["foo.tar", "foo-1337/Makefile"],
@@ -191,7 +191,7 @@ mod tests {
             &["foo.tar", "foo-1337/src/help.h"],
             &["foo.tar", "foo-1337/some.jar", "MANIFEST.MF"],
             &["other.dsc"]
-        ])) {
+        ]))) {
             println!("{:?}", out);
         }
     }
@@ -200,5 +200,10 @@ mod tests {
         what.iter().map(|inner|
             inner.iter().map(|x| x.to_string()).collect::<Vec<String>>()
         ).collect::<Vec<Vec<String>>>()
+    }
+
+    fn refify(what: &Vec<Vec<String>>) -> Vec<Vec<&String>> {
+        // horrible implementation, sane method
+        what.iter().map(|x| x.iter().collect()).collect()
     }
 }

@@ -41,10 +41,12 @@ fn run() -> Result<i32> {
 
     let temp_files = temps::read(out_dir.as_str())?;
 
+    let all_paths = simplify_path::simplify(temp_files.iter().map(|temp| temp.header.paths.iter().collect()).collect());
+
     let data_conn = connect()?;
 
-    let name_ids = write_names(&data_conn, &temp_files.iter()
-        .flat_map(|file| file.header.paths.iter())
+    let name_ids = write_names(&data_conn, &all_paths.iter()
+        .flat_map(|path| path.iter())
         .collect::<Vec<&String>>())?;
 
     let mut blobs = HashMap::with_capacity(temp_files.len());
@@ -60,14 +62,14 @@ INSERT INTO container (info) VALUES (to_jsonb($1::text)) RETURNING id
     let insert_file = meta_tran.prepare("
 INSERT INTO file (container, pos, paths) VALUES ($1, $2, $3)
 ")?;
-    for file in temp_files {
+    for (file, path) in temp_files.iter().zip(all_paths) {
         let pos: u64 = match blobs.entry(file.hash) {
             hash_map::Entry::Vacant(storable) =>
                 *storable.insert(maybe_store(out_dir.as_str(), &file, data_conn.transaction()?)?),
             hash_map::Entry::Occupied(occupied) => *occupied.get(),
         };
 
-        let path = file.header.paths.iter().map(|part| name_ids[part]).collect::<Vec<i64>>();
+        let path = path.iter().map(|part| name_ids[part]).collect::<Vec<i64>>();
         insert_file.execute(&[&container_id, &(pos as i64), &path])?;
     }
 
