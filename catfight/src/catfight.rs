@@ -35,7 +35,9 @@ fn unarchive(root: &str, block_size: u64, offset: u64) -> Result<()> {
             Ok(())
         }
         None => {
-            bail!(ErrorKind::InvalidState("read appears to be past the end of the file".to_string()))
+            bail!(ErrorKind::InvalidState(
+                "read appears to be past the end of the file".to_string(),
+            ))
         }
     }
 

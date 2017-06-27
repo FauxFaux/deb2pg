@@ -39,18 +39,26 @@ struct Mapped<'a, T: 'a> {
     data: &'a mut [T],
 }
 
-impl <'a, T: 'a> Mapped<'a, T> {
+impl<'a, T: 'a> Mapped<'a, T> {
     fn fixed_len<P>(path: P, len: usize) -> io::Result<Mapped<'a, T>>
-        where P: AsRef<path::Path> {
-        let file = fs::OpenOptions::new().read(true).write(true).create(true).open(path)?;
+    where
+        P: AsRef<path::Path>,
+    {
+        let file = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(path)?;
         file.set_len(mem::size_of::<T>() as u64 * len as u64)?;
         let map: *mut c_void = unsafe {
-            libc::mmap(0 as *mut c_void,
-                       len * mem::size_of::<T>(),
-                       libc::PROT_READ | libc::PROT_WRITE,
-                       libc::MAP_SHARED,
-                       file.as_raw_fd(),
-                       0)
+            libc::mmap(
+                0 as *mut c_void,
+                len * mem::size_of::<T>(),
+                libc::PROT_READ | libc::PROT_WRITE,
+                libc::MAP_SHARED,
+                file.as_raw_fd(),
+                0,
+            )
         };
 
         if libc::MAP_FAILED == map {
@@ -64,10 +72,12 @@ impl <'a, T: 'a> Mapped<'a, T> {
     fn remap(&mut self, len: usize) -> io::Result<()> {
         self.file.set_len(mem::size_of::<T>() as u64 * len as u64)?;
         let new_map = unsafe {
-            libc::mremap(self.map,
-                         self.data.len() * mem::size_of::<T>(),
-                         len * mem::size_of::<T>(),
-                         libc::MREMAP_MAYMOVE)
+            libc::mremap(
+                self.map,
+                self.data.len() * mem::size_of::<T>(),
+                len * mem::size_of::<T>(),
+                libc::MREMAP_MAYMOVE,
+            )
         };
 
         if libc::MAP_FAILED == new_map {
@@ -80,10 +90,13 @@ impl <'a, T: 'a> Mapped<'a, T> {
     }
 }
 
-impl <'a, T: 'a> Drop for Mapped<'a, T> {
+impl<'a, T: 'a> Drop for Mapped<'a, T> {
     fn drop(&mut self) {
         unsafe {
-            assert_eq!(0, libc::munmap(self.map, self.data.len() * mem::size_of::<T>()));
+            assert_eq!(
+                0,
+                libc::munmap(self.map, self.data.len() * mem::size_of::<T>())
+            );
         }
     }
 }
@@ -106,11 +119,13 @@ impl<'a> Index<'a> {
                 let proposed: u64 = m.len() / mem::size_of::<u64>() as u64;
                 assert!(proposed < usize::max_value() as u64);
                 proposed as usize
-            },
-            Err(e) => if e.kind() == io::ErrorKind::NotFound {
-                2 * page_size
-            } else {
-                panic!("couldn't get info on pages file: {}", e)
+            }
+            Err(e) => {
+                if e.kind() == io::ErrorKind::NotFound {
+                    2 * page_size
+                } else {
+                    panic!("couldn't get info on pages file: {}", e)
+                }
             }
         };
 
@@ -127,7 +142,12 @@ impl<'a> Index<'a> {
             free_page -= 1;
         }
 
-        Ok(Index { idx, pages, free_page, page_size })
+        Ok(Index {
+            idx,
+            pages,
+            free_page,
+            page_size,
+        })
     }
 
     fn page_for(&mut self, trigram: u32) -> io::Result<usize> {
@@ -220,16 +240,21 @@ fn main() {
     {
         let mut ap = argparse::ArgumentParser::new();
         ap.set_description("totally not a load of tools glued together");
-        ap.refer(&mut from)
-                .required()
-                .add_option(&["-f", "--input-file"], Store,
-                            "pack file to read");
-        ap.refer(&mut addendum)
-                .add_option(&["-i", "--addendum"], Store,
-                            "number to add to file offset");
-        ap.refer(&mut simple)
-                .add_option(&["--simple"], StoreTrue,
-                            "not a pack, just a normal decompressed file");
+        ap.refer(&mut from).required().add_option(
+            &["-f", "--input-file"],
+            Store,
+            "pack file to read",
+        );
+        ap.refer(&mut addendum).add_option(
+            &["-i", "--addendum"],
+            Store,
+            "number to add to file offset",
+        );
+        ap.refer(&mut simple).add_option(
+            &["--simple"],
+            StoreTrue,
+            "not a pack, just a normal decompressed file",
+        );
         ap.parse_args_or_exit();
     }
 
@@ -252,7 +277,7 @@ fn main() {
                     break;
                 }
                 println!("document {}: trigramming failed: {}", document, e)
-            },
+            }
         };
     }
 }

@@ -23,7 +23,15 @@ fn hello_world() {
 
     let dir = tempdir::TempDir::new("catfight-smoke").unwrap();
 
-    assert_eq!(FILE_HEADER_LEN, catfight::store(BLOCK_SIZE, &mut src, dir.path().join("a").to_str().unwrap(), b"world").unwrap());
+    assert_eq!(
+        FILE_HEADER_LEN,
+        catfight::store(
+            BLOCK_SIZE,
+            &mut src,
+            dir.path().join("a").to_str().unwrap(),
+            b"world",
+        ).unwrap()
+    );
 
     // implementation detail: file name
     let mut archive = fs::File::open(dir.path().join("a.0000000000000000000000")).unwrap();
@@ -37,5 +45,5 @@ fn hello_world() {
         assert_eq!(b"hello", into.as_slice());
     }
 
-//    assert!(catfight::read_record(&mut archive).unwrap().is_none())
+    //    assert!(catfight::read_record(&mut archive).unwrap().is_none())
 }

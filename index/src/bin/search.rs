@@ -44,25 +44,33 @@ impl fmt::Display for Op {
 fn unpack(e: &Expr) -> Result<Op, String> {
     println!("unpacking: {}", e);
     match *e {
-        Expr::Group { ref e, i: _, name: _ } => {
+        Expr::Group {
+            ref e,
+            i: _,
+            name: _,
+        } => {
             println!("group of..");
             unpack(&e)
-        },
-        Expr::Repeat { ref e, ref r, greedy } => {
+        }
+        Expr::Repeat {
+            ref e,
+            ref r,
+            greedy,
+        } => {
             use regex_syntax::Repeater;
             println!("{} repeat of {} ..", greedy, r);
             match *r {
                 Repeater::ZeroOrOne |
                 Repeater::ZeroOrMore |
                 Repeater::Range { min: 0, max: _ } => Ok(Op::Any),
-                _ => unpack(&e)
+                _ => unpack(&e),
             }
-        },
+        }
         Expr::Concat(ref exprs) => {
             println!("{} different expressions ..", exprs.len());
             let maybe: Result<Vec<Op>, String> = exprs.iter().map(unpack).collect();
             Ok(Op::And(maybe?))
-        },
+        }
         Expr::Alternate(ref exprs) => {
             println!("{} alternate expressions ..", exprs.len());
             let maybe: Result<Vec<Op>, String> = exprs.iter().map(unpack).collect();
@@ -72,12 +80,19 @@ fn unpack(e: &Expr) -> Result<Op, String> {
         Expr::Literal { ref chars, casei } => {
             let lit = chars.iter().collect::<String>();
             if casei {
-                return Err(format!("unsupported: case insensitive matching on '{}'", lit));
+                return Err(format!(
+                    "unsupported: case insensitive matching on '{}'",
+                    lit
+                ));
             }
             println!("literal: {} ({})", lit, casei);
 
-            Ok(Op::And(tri::trigrams_full(lit.as_str())
-                    .into_iter().map(|gram| Op::Lit(gram as u32)).collect()))
+            Ok(Op::And(
+                tri::trigrams_full(lit.as_str())
+                    .into_iter()
+                    .map(|gram| Op::Lit(gram as u32))
+                    .collect(),
+            ))
         }
 
         ref other => Err(format!("unimplemented: {}", other)),
