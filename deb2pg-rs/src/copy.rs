@@ -16,13 +16,13 @@ pub trait MyRawFd {
 
 impl MyRawFd for io::Stdout {
     fn my_raw_fd(&self) -> RawFd {
-        return 1;
+        1
     }
 }
 
 impl MyRawFd for File {
     fn my_raw_fd(&self) -> RawFd {
-        return self.as_raw_fd();
+        self.as_raw_fd()
     }
 }
 
@@ -60,12 +60,12 @@ fn try_sendfile(src: &File, dest: &MyRawFd, len: u64) -> Result<(), CopyFailure>
             remaining -= sent as u64;
         }
     }
-    return Ok(());
+    Ok(())
 }
 
 fn try_streams(src: &mut File, dest: &mut io::Write, len: u64) -> Result<(), ()> {
     assert_eq!(len, std::io::copy(src, dest).unwrap());
-    return Ok(());
+    Ok(())
 }
 
 pub fn copy_file<T: MyRawFd + io::Write> (src: &mut File, dest: &mut T, len: u64) -> Result<(), io::Error> {
@@ -81,5 +81,5 @@ pub fn copy_file<T: MyRawFd + io::Write> (src: &mut File, dest: &mut T, len: u64
 
     try_streams(src, dest, len).unwrap();
 
-    return Ok(());
+    Ok(())
 }

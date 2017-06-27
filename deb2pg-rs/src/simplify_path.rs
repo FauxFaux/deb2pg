@@ -43,10 +43,9 @@ fn shortest_match(left: &str, right: &str) -> String {
 ///    ''
 ///    >>> find_prefix(['one/two', 'two'])
 ///    ''
-fn find_prefix(within: Vec<String>) -> String {
-
-    let mut it = within.iter();
-    let empty_string = "".to_string();
+fn find_prefix<'a, I>(mut it: I) -> String
+where I: Iterator<Item=&'a String> {
+    let empty_string = String::new();
     let mut prefix: String = it.next().unwrap_or(&empty_string).to_string();
     for item in it {
         if item.starts_with(prefix.as_str()) {
@@ -62,10 +61,10 @@ fn find_prefix(within: Vec<String>) -> String {
 }
 
 fn strip_prefix<T>(off_of: HashMap<String, T>) -> (String, HashMap<String, T>) {
-    let prefix = find_prefix(off_of.keys().map(|s| s.to_string()).collect());
+    let prefix = find_prefix(off_of.keys());
 
     if prefix.is_empty() {
-        (prefix, off_of)
+        (String::new(), off_of)
     } else {
         let mut new_val = HashMap::with_capacity(off_of.len());
         for (k, v) in off_of {
@@ -141,7 +140,7 @@ fn add(into: &mut HashMap<String, Node>, remaining: &[&String], pos: usize) {
         _ => {
             match into.entry(remaining[0].to_string()) {
                 hash_map::Entry::Occupied(mut exists) => {
-                    if let &mut Node::Dir(ref mut map) = exists.get_mut() {
+                    if let Node::Dir(ref mut map) = *exists.get_mut() {
                         add(map, &remaining[1..], pos);
                     }
                 }

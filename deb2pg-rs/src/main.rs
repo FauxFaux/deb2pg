@@ -65,7 +65,7 @@ INSERT INTO file (container, pos, paths) VALUES ($1, $2, $3)
     for (file, path) in temp_files.iter().zip(all_paths) {
         let pos: u64 = match blobs.entry(file.hash) {
             hash_map::Entry::Vacant(storable) =>
-                *storable.insert(maybe_store(out_dir.as_str(), &file, data_conn.transaction()?)?),
+                *storable.insert(maybe_store(out_dir.as_str(), file, data_conn.transaction()?)?),
             hash_map::Entry::Occupied(occupied) => *occupied.get(),
         };
 

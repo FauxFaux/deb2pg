@@ -47,7 +47,7 @@ fn unarchive(root: &str, block_size: u64, offset: u64) -> Result<()> {
 
     copy_file(&mut fd, &mut io::stdout(), end - extra_len - 8 - 8)?;
 
-    return Ok(());
+    Ok(())
 }
 
 fn flock(what: &File) -> Result<()> {
@@ -68,7 +68,7 @@ fn unlock_flock(what: &File) -> Result<()> {
     }
 }
 
-pub fn store(blocksize: u64, src_path: &str, dest_root: &str, extra: &String) -> Result<u64> {
+pub fn store(blocksize: u64, src_path: &str, dest_root: &str, extra: &str) -> Result<u64> {
     let mut src = File::open(src_path).chain_err(|| "couldn't open source file")?;
 
     let src_len: u64 = fs::metadata(src_path).chain_err(|| "couldn't stat source file")?.len();

@@ -43,7 +43,7 @@ fn is_text(buf: &[u8]) -> bool {
             }
     }
 
-    return true;
+    true
 }
 
 fn hash_compress_write_from_slice<W>(buf: &[u8], to: W) -> ([u8; 256 / 8], bool)
