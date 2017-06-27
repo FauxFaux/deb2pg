@@ -9,6 +9,9 @@ use copy::copy_file;
 
 use errors::*;
 
+use peeky_read::PeekyRead;
+
+use std::io::Read;
 use std::io::Seek;
 use std::io::Write;
 use std::os::unix::io::AsRawFd;
@@ -25,34 +28,43 @@ fn unarchive(root: &str, block_size: u64, offset: u64) -> Result<()> {
 
     let target_path = format!("{}.{:022}", root, target_file_id);
     let mut fd = File::open(target_path)?;
-    let file_len = fd.seek(io::SeekFrom::End(0))?;
 
     fd.seek(io::SeekFrom::Start(target_file_offset))?;
+    match read_record(&mut fd)? {
+        Some((_, mut reader)) => {
+            io::copy(&mut reader, &mut io::stdout())?;
+            Ok(())
+        }
+        None => {
+            bail!(ErrorKind::InvalidState("read appears to be past the end of the file".to_string()))
+        }
+    }
+
+}
+
+pub fn read_record<R: io::Read>(fd: &mut R) -> Result<Option<(Vec<u8>, io::Take<PeekyRead<R>>)>> {
+    let mut fd = PeekyRead::new(fd);
+    if fd.check_eof()? {
+        return Ok(None);
+    }
+
     let end = fd.read_u64::<LittleEndian>()?;
     let extra_len = fd.read_u64::<LittleEndian>()?;
 
     ensure!(end >= 8 + 8, "there isn't even a header, invalid offset?");
-
     ensure!(
-        extra_len < std::i64::MAX as u64,
+        extra_len < std::i64::MAX as u64 && extra_len < std::usize::MAX as u64,
         "extra length is far too large, invalid offset?"
     );
-
     ensure!(
         extra_len <= end - 8 - 8,
         "too much extra data for record; invalid offset?"
     );
 
-    ensure!(
-        target_file_offset + end <= file_len,
-        "record extends beyond end of file; invalid offset?"
-    );
+    let mut extra = vec![0u8; extra_len as usize];
+    fd.read_exact(&mut extra)?;
 
-    fd.seek(io::SeekFrom::Current(extra_len as i64))?;
-
-    copy_file(&mut fd, &mut io::stdout(), end - extra_len - 8 - 8)?;
-
-    Ok(())
+    Ok(Some((extra, fd.take(end - 8 - 8 - extra_len))))
 }
 
 fn flock(what: &File) -> Result<()> {
