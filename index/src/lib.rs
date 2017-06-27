@@ -13,6 +13,9 @@ mod indexer;
 mod search;
 mod tri;
 
+#[cfg(test)]
+mod tests;
+
 mod errors {
     error_chain! {
         foreign_links {

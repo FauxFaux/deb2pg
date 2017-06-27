@@ -11,7 +11,7 @@ type Tri = u32;
 use tri;
 
 #[derive(PartialEq, Eq, Hash, Debug)]
-enum Op {
+pub enum Op {
     And(Vec<Op>),
     Or(Vec<Op>),
     Any,
@@ -31,7 +31,7 @@ fn render_grams_in(vec: &Vec<Op>) -> String {
 impl fmt::Display for Op {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Op::Lit(tri) => write!(f, "{}", tri::unpack(tri as usize)),
+            Op::Lit(tri) => write!(f, "{}", tri::explain_packed(tri as usize)),
             Op::And(ref vec) => write!(f, "and({})", render_grams_in(vec)),
             Op::Or(ref vec) => write!(f, "or({})", render_grams_in(vec)),
             Op::Any => write!(f, "FUUUU"),
@@ -39,7 +39,7 @@ impl fmt::Display for Op {
     }
 }
 
-fn unpack(e: &Expr) -> Result<Op> {
+pub fn analyze(e: &Expr) -> Result<Op> {
     println!("unpacking: {}", e);
     match *e {
         Expr::Group {
@@ -48,7 +48,7 @@ fn unpack(e: &Expr) -> Result<Op> {
             name: _,
         } => {
             println!("group of..");
-            unpack(&e)
+            analyze(&e)
         }
         Expr::Repeat {
             ref e,
@@ -61,17 +61,17 @@ fn unpack(e: &Expr) -> Result<Op> {
                 Repeater::ZeroOrOne |
                 Repeater::ZeroOrMore |
                 Repeater::Range { min: 0, max: _ } => Ok(Op::Any),
-                _ => unpack(&e),
+                _ => analyze(&e),
             }
         }
         Expr::Concat(ref exprs) => {
             println!("{} different expressions ..", exprs.len());
-            let maybe: Result<Vec<Op>> = exprs.iter().map(unpack).collect();
+            let maybe: Result<Vec<Op>> = exprs.iter().map(analyze).collect();
             Ok(Op::And(maybe?))
         }
         Expr::Alternate(ref exprs) => {
             println!("{} alternate expressions ..", exprs.len());
-            let maybe: Result<Vec<Op>> = exprs.iter().map(unpack).collect();
+            let maybe: Result<Vec<Op>> = exprs.iter().map(analyze).collect();
             Ok(Op::Or(maybe?))
         }
 
@@ -95,11 +95,4 @@ fn unpack(e: &Expr) -> Result<Op> {
 
         ref other => bail!(format!("unimplemented: {}", other)),
     }
-}
-
-fn main() {
-    let regex = env::args().skip(1).next().expect("first arg: regex");
-    println!("{}", regex);
-    let e = Expr::parse(regex.as_str()).unwrap();
-    println!("{}", unpack(&e).unwrap());
 }

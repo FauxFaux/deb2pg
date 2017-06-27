@@ -80,7 +80,7 @@ fn explain(wut: u8) -> char {
     }
 }
 
-pub fn unpack(wut: usize) -> String {
+pub fn explain_packed(wut: usize) -> String {
     let mut ret = String::with_capacity(3);
     ret.push(explain((wut / 64 / 64 % 64) as u8));
     ret.push(explain((wut / 64 % 64) as u8));
