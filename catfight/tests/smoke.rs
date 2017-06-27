@@ -37,13 +37,13 @@ fn hello_world() {
     let mut archive = fs::File::open(dir.path().join("a.0000000000000000000000")).unwrap();
     archive.seek(SeekFrom::Start(FILE_HEADER_LEN)).unwrap();
     {
-        let (extra, mut reader) = catfight::read_record(&mut archive).unwrap().unwrap();
+        let mut record = catfight::read_record(&mut archive).unwrap().unwrap();
         let mut into = Vec::new();
-        reader.read_to_end(&mut into).unwrap();
+        record.reader.read_to_end(&mut into).unwrap();
 
-        assert_eq!(b"world", extra.as_slice());
+        assert_eq!(b"world", record.extra.as_slice());
         assert_eq!(b"hello", into.as_slice());
     }
 
-    //    assert!(catfight::read_record(&mut archive).unwrap().is_none())
+    assert!(catfight::read_record(&mut archive).unwrap().is_none())
 }

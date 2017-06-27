@@ -29,9 +29,14 @@ fn unarchive(root: &str, block_size: u64, offset: u64) -> Result<()> {
     let mut fd = File::open(target_path)?;
 
     fd.seek(io::SeekFrom::Start(target_file_offset))?;
-    match read_record(&mut fd)? {
-        Some((_, mut reader)) => {
-            io::copy(&mut reader, &mut io::stdout())?;
+    let mut record_option = read_record(&mut fd)?;
+    match record_option {
+        Some(Record {
+                 ref mut reader,
+                 extra: _,
+                 realign: _,
+             }) => {
+            io::copy(reader, &mut io::stdout())?;
             Ok(())
         }
         None => {
@@ -40,10 +45,30 @@ fn unarchive(root: &str, block_size: u64, offset: u64) -> Result<()> {
             ))
         }
     }
-
 }
 
-pub fn read_record<R: io::Read>(fd: &mut R) -> Result<Option<(Vec<u8>, io::Take<PeekyRead<R>>)>> {
+pub struct Record<'a, R: 'a>
+where
+    R: io::Read,
+{
+    pub reader: io::Take<PeekyRead<'a, R>>,
+    pub extra: Vec<u8>,
+    realign: u8,
+}
+
+impl<'a, R> Drop for Record<'a, R>
+where
+    R: std::io::Read,
+{
+    fn drop(&mut self) {
+        let mut buf = vec![0u8; self.realign as usize];
+        self.reader.get_mut().read_exact(&mut buf).expect(
+            "realigning",
+        );
+    }
+}
+
+pub fn read_record<R: io::Read>(fd: &mut R) -> Result<Option<Record<R>>> {
     let mut fd = PeekyRead::new(fd);
     if fd.check_eof()? {
         return Ok(None);
@@ -65,7 +90,11 @@ pub fn read_record<R: io::Read>(fd: &mut R) -> Result<Option<(Vec<u8>, io::Take<
     let mut extra = vec![0u8; extra_len as usize];
     fd.read_exact(&mut extra)?;
 
-    Ok(Some((extra, fd.take(end - 8 - 8 - extra_len))))
+    Ok(Some(Record {
+        reader: fd.take(end - 8 - 8 - extra_len),
+        extra,
+        realign: (align(end) - end) as u8,
+    }))
 }
 
 fn flock(what: &File) -> Result<()> {
