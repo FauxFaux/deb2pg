@@ -4,7 +4,6 @@ extern crate catfight;
 extern crate ci_capnp;
 #[macro_use]
 extern crate error_chain;
-extern crate libc;
 extern crate lz4;
 extern crate num_cpus;
 extern crate postgres;

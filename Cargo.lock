@@ -7,7 +7,6 @@ dependencies = [
  "catfight 0.1.0",
  "ci_capnp 0.1.0",
  "error-chain 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.24 (registry+https://github.com/rust-lang/crates.io-index)",
  "lz4 1.21.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "num_cpus 1.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "postgres 0.14.1 (registry+https://github.com/rust-lang/crates.io-index)",
