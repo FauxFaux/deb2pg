@@ -190,7 +190,7 @@ fn complete(
 }
 
 pub fn encode_hash(hash: &[u8]) -> String {
-    let mut encoded_hash = base32::encode(base32::Alphabet::RFC4648 { padding: false }, &hash);
+    let mut encoded_hash = base32::encode(base32::Alphabet::RFC4648 { padding: false }, hash);
     encoded_hash.make_ascii_lowercase();
     encoded_hash
 }
