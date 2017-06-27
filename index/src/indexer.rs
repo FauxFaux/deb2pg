@@ -21,6 +21,8 @@ use std::os::unix::io::AsRawFd;
 
 use tri;
 
+use errors::*;
+
 static TRI_MAX: usize = 64 * 64 * 64;
 
 struct Mapped<'a, T: 'a> {
@@ -30,7 +32,7 @@ struct Mapped<'a, T: 'a> {
 }
 
 impl<'a, T: 'a> Mapped<'a, T> {
-    fn fixed_len<P>(path: P, len: usize) -> io::Result<Mapped<'a, T>>
+    fn fixed_len<P>(path: P, len: usize) -> Result<Mapped<'a, T>>
     where
         P: AsRef<path::Path>,
     {
@@ -52,14 +54,14 @@ impl<'a, T: 'a> Mapped<'a, T> {
         };
 
         if libc::MAP_FAILED == map {
-            return Err(io::Error::last_os_error());
+            bail!(io::Error::last_os_error());
         }
 
         let data = unsafe { slice::from_raw_parts_mut(map as *mut T, len) };
         Ok(Mapped { file, map, data })
     }
 
-    fn remap(&mut self, len: usize) -> io::Result<()> {
+    fn remap(&mut self, len: usize) -> Result<()> {
         self.file.set_len(mem::size_of::<T>() as u64 * len as u64)?;
         let new_map = unsafe {
             libc::mremap(
@@ -71,7 +73,7 @@ impl<'a, T: 'a> Mapped<'a, T> {
         };
 
         if libc::MAP_FAILED == new_map {
-            return Err(io::Error::last_os_error());
+            bail!(io::Error::last_os_error());
         }
 
         self.data = unsafe { slice::from_raw_parts_mut(new_map as *mut T, len) };
@@ -99,7 +101,7 @@ struct Index<'a> {
 }
 
 impl<'a> Index<'a> {
-    fn new() -> io::Result<Index<'a>> {
+    fn new() -> Result<Index<'a>> {
         let idx: Mapped<u32> = Mapped::fixed_len("idx", TRI_MAX).unwrap();
 
         let page_size: usize = 1024;
@@ -140,7 +142,7 @@ impl<'a> Index<'a> {
         })
     }
 
-    fn page_for(&mut self, trigram: u32) -> io::Result<usize> {
+    fn page_for(&mut self, trigram: u32) -> Result<usize> {
         assert!(trigram < TRI_MAX as u32);
 
         let page = self.idx.data[trigram as usize] as usize;
@@ -153,7 +155,7 @@ impl<'a> Index<'a> {
         Ok(found_page)
     }
 
-    fn next_page(&mut self) -> io::Result<usize> {
+    fn next_page(&mut self) -> Result<usize> {
         let ret = self.free_page;
         self.free_page += 1;
         if self.free_page >= self.pages.data.len() / self.page_size {
@@ -164,7 +166,7 @@ impl<'a> Index<'a> {
         Ok(ret)
     }
 
-    fn append(&mut self, trigram: u32, document: u64) -> io::Result<()> {
+    fn append(&mut self, trigram: u32, document: u64) -> Result<()> {
         let mut page = self.page_for(trigram)?;
         let mut header_loc;
         let mut header;
@@ -188,7 +190,7 @@ impl<'a> Index<'a> {
         Ok(())
     }
 
-    fn append_trigrams(&mut self, trigrams: BitSet, document: u64) -> io::Result<()> {
+    fn append_trigrams(&mut self, trigrams: BitSet, document: u64) -> Result<()> {
         for found in trigrams.iter() {
             self.append(found as u32, document)?;
         }
@@ -206,7 +208,7 @@ fn round_up(x: u64) -> u64 {
     }
 }
 
-fn eat_chunk(mut fh: &mut fs::File) -> io::Result<BitSet> {
+fn eat_chunk(mut fh: &mut fs::File) -> Result<BitSet> {
     let end = fh.read_u64::<BigEndian>()?;
     let extra_len = fh.read_u64::<BigEndian>()?;
     let start = fh.seek(io::SeekFrom::Current(extra_len as i64))?;
@@ -216,7 +218,7 @@ fn eat_chunk(mut fh: &mut fs::File) -> io::Result<BitSet> {
         let exploding = range.map(|x| x.unwrap());
         let decoder = std::char::decode_utf8(exploding);
         let errors = decoder.map(|x| x.map_err(|_| io::CharsError::NotUtf8));
-        tri::trigrams_for(errors).map_err(|msg| io::Error::new(io::ErrorKind::Other, msg))
+        tri::trigrams_for(errors)
     };
     let next = round_up(start + end - extra_len - 16);
     fh.seek(io::SeekFrom::Start(next))?;
@@ -243,9 +245,7 @@ fn index() {
         match eat_chunk(&mut fh) {
             Ok(trigrams) => idx.append_trigrams(trigrams, document).unwrap(),
             Err(e) => {
-                if e.kind() == io::ErrorKind::UnexpectedEof {
-                    break;
-                }
+                // TODO: handle EOF
                 println!("document {}: trigramming failed: {}", document, e)
             }
         };

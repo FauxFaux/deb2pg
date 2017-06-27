@@ -4,6 +4,8 @@ use std::io;
 
 use regex_syntax::Expr;
 
+use errors::*;
+
 type Tri = u32;
 
 use tri;
@@ -37,7 +39,7 @@ impl fmt::Display for Op {
     }
 }
 
-fn unpack(e: &Expr) -> Result<Op, String> {
+fn unpack(e: &Expr) -> Result<Op> {
     println!("unpacking: {}", e);
     match *e {
         Expr::Group {
@@ -64,19 +66,19 @@ fn unpack(e: &Expr) -> Result<Op, String> {
         }
         Expr::Concat(ref exprs) => {
             println!("{} different expressions ..", exprs.len());
-            let maybe: Result<Vec<Op>, String> = exprs.iter().map(unpack).collect();
+            let maybe: Result<Vec<Op>> = exprs.iter().map(unpack).collect();
             Ok(Op::And(maybe?))
         }
         Expr::Alternate(ref exprs) => {
             println!("{} alternate expressions ..", exprs.len());
-            let maybe: Result<Vec<Op>, String> = exprs.iter().map(unpack).collect();
+            let maybe: Result<Vec<Op>> = exprs.iter().map(unpack).collect();
             Ok(Op::Or(maybe?))
         }
 
         Expr::Literal { ref chars, casei } => {
             let lit = chars.iter().collect::<String>();
             if casei {
-                return Err(format!(
+                bail!(format!(
                     "unsupported: case insensitive matching on '{}'",
                     lit
                 ));
@@ -91,7 +93,7 @@ fn unpack(e: &Expr) -> Result<Op, String> {
             ))
         }
 
-        ref other => Err(format!("unimplemented: {}", other)),
+        ref other => bail!(format!("unimplemented: {}", other)),
     }
 }
 

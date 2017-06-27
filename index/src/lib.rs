@@ -3,6 +3,8 @@
 
 extern crate bit_set;
 extern crate byteorder;
+#[macro_use]
+extern crate error_chain;
 extern crate libc;
 extern crate lz4;
 extern crate regex_syntax;
@@ -10,3 +12,11 @@ extern crate regex_syntax;
 mod indexer;
 mod search;
 mod tri;
+
+mod errors {
+    error_chain! {
+        foreign_links {
+            Io(::std::io::Error);
+        }
+    }
+}

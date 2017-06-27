@@ -1,9 +1,12 @@
+use std::result;
 use std::io;
 use std::collections::HashSet;
 
 use bit_set::BitSet;
 
-pub type CharResult = Result<char, io::CharsError>;
+use errors::*;
+
+pub type CharResult = result::Result<char, io::CharsError>;
 
 fn simplify(wut: char) -> u8 {
     let c = match wut {
@@ -113,7 +116,7 @@ pub fn trigrams_full(input: &str) -> Vec<u32> {
     found.into_iter().collect()
 }
 
-pub fn trigrams_for<T: Iterator<Item = CharResult>>(input: T) -> Result<BitSet, String> {
+pub fn trigrams_for<T: Iterator<Item = CharResult>>(input: T) -> Result<BitSet> {
     let mut line: u64 = 1;
     let mut prev: [u8; 3] = [0; 3];
     let mut ret: BitSet = BitSet::with_capacity(64 * 64 * 64);
@@ -126,7 +129,7 @@ pub fn trigrams_for<T: Iterator<Item = CharResult>>(input: T) -> Result<BitSet, 
             line += 1;
         }
         if '\0' == c {
-            return Err(format!("line {}: null found: not a text file", line));
+            bail!(format!("line {}: null found: not a text file", line));
         }
         prev[0] = prev[1];
         prev[1] = prev[2];
