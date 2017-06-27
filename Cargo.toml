@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "catfight",
+    "index",
     "ingest",
 ]
 
