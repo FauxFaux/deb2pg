@@ -167,9 +167,9 @@ SELECT pg_advisory_unlock(18787)
     let pos = (shard_id as u64) +
         catfight::store(
             1024 * 1024 * 1024,
-            file.name.as_str(),
+            &mut fs::File::open(&file.name)?,
             format!("{}/{}", shard_root, shard_name).as_str(),
-            &temps::encode_hash(&file.hash),
+            &file.hash,
         )?;
 
     curr.prepare_cached(

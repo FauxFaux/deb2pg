@@ -1,6 +1,5 @@
 use std;
 use std::io;
-use std::fs;
 use std::fs::File;
 
 use libc;
@@ -85,12 +84,8 @@ fn unlock_flock(what: &File) -> Result<()> {
     }
 }
 
-pub fn store(blocksize: u64, src_path: &str, dest_root: &str, extra: &str) -> Result<u64> {
-    let mut src = File::open(src_path).chain_err(
-        || "couldn't open source file",
-    )?;
-
-    let src_len: u64 = fs::metadata(src_path)
+pub fn store(blocksize: u64, src: &mut File, dest_root: &str, extra: &[u8]) -> Result<u64> {
+    let src_len: u64 = src.metadata()
         .chain_err(|| "couldn't stat source file")?
         .len();
 
@@ -126,14 +121,14 @@ pub fn store(blocksize: u64, src_path: &str, dest_root: &str, extra: &str) -> Re
         let record_end = 8 + 8 + src_len + extra_len;
         fd.write_u64::<LittleEndian>(record_end)?;
         fd.write_u64::<LittleEndian>(extra_len)?;
-        fd.write_all(extra.as_bytes())?;
+        fd.write_all(extra)?;
         fd.flush()?;
 
         fd.set_len(file_end + align(record_end))?;
 
         unlock_flock(&fd)?;
 
-        copy_file(&mut src, &mut fd, src_len)?;
+        copy_file(src, &mut fd, src_len)?;
 
         return Ok(file_end);
     }
