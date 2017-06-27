@@ -19,14 +19,8 @@ use std::io::Read;
 use std::io::Write;
 use sha2::Digest;
 
-fn tools() -> (
-    sha2::Sha256,
-    lz4::EncoderBuilder,
-) {
-    (
-        sha2::Sha256::default(),
-        lz4::EncoderBuilder::new(),
-    )
+fn tools() -> (sha2::Sha256, lz4::EncoderBuilder) {
+    (sha2::Sha256::default(), lz4::EncoderBuilder::new())
 }
 
 fn is_text(buf: &[u8]) -> bool {
@@ -38,16 +32,18 @@ fn is_text(buf: &[u8]) -> bool {
             // SO, SI, DLE, DC?, NAK, SYN, ETB, CAN, EM, SUB, ESC (colour codes?),
             // FS, GS, RS, US
             || (*char >= 14 && *char < 32)
-            {
-                return false;
-            }
+        {
+            return false;
+        }
     }
 
     true
 }
 
 fn hash_compress_write_from_slice<W>(buf: &[u8], to: W) -> ([u8; 256 / 8], bool)
-    where W: Write {
+where
+    W: Write,
+{
     let (mut hasher, lz4) = tools();
     let mut lz4 = lz4.build(to).expect("lz4 writer");
 
@@ -59,8 +55,9 @@ fn hash_compress_write_from_slice<W>(buf: &[u8], to: W) -> ([u8; 256 / 8], bool)
 }
 
 fn hash_compress_write_from_reader<R, W>(mut from: R, to: W) -> (u64, [u8; 256 / 8], bool)
-    where W: Write,
-          R: Read
+where
+    W: Write,
+    R: Read,
 {
     let (mut hasher, lz4) = tools();
     let mut lz4 = lz4.build(to).expect("lz4 writer");
@@ -72,7 +69,7 @@ fn hash_compress_write_from_reader<R, W>(mut from: R, to: W) -> (u64, [u8; 256 /
 
         let read = from.read(&mut buf).expect("reading");
         if 0 == read {
-            break
+            break;
         }
 
         total_read += read as u64;
@@ -110,12 +107,13 @@ pub fn read(out_dir: &str) -> Result<(Vec<TempFile>)> {
         let alphabet_chars = "abcdefghijklmnopqrstuvwxyz234567";
         for first in alphabet_chars.chars() {
             for second in alphabet_chars.chars() {
-                fs::create_dir_all(format!("{}/{}{}", out_dir, first, second)).expect("intermediate dir");
+                fs::create_dir_all(format!("{}/{}{}", out_dir, first, second))
+                    .expect("intermediate dir");
             }
         }
     }
 
-    let store: Vec<TempFile> = vec!();
+    let store: Vec<TempFile> = vec![];
     let dest = Arc::new(Mutex::new(store));
 
     let (sender, pool) = thread_pool::Builder::new()
@@ -130,8 +128,9 @@ pub fn read(out_dir: &str) -> Result<(Vec<TempFile>)> {
             continue;
         }
 
-        let mut temp = tempfile::NamedTempFileOptions::new().suffix(".tmp").
-            create_in(&out_dir)
+        let mut temp = tempfile::NamedTempFileOptions::new()
+            .suffix(".tmp")
+            .create_in(&out_dir)
             .expect("temp file");
 
         if en.len < 16 * 1024 * 1024 {
@@ -140,11 +139,13 @@ pub fn read(out_dir: &str) -> Result<(Vec<TempFile>)> {
 
             let out_dir = out_dir.to_string();
             let dest = dest.clone();
-            sender.send(move || {
-                let (hash, text) = hash_compress_write_from_slice(&buf, &mut temp);
+            sender
+                .send(move || {
+                    let (hash, text) = hash_compress_write_from_slice(&buf, &mut temp);
 
-                complete(en, temp, hash, out_dir.as_str(), text, &dest).unwrap();
-            }).expect("offloading");
+                    complete(en, temp, hash, out_dir.as_str(), text, &dest).unwrap();
+                })
+                .expect("offloading");
             pool_used = true;
         } else {
             let file_data = (&mut stdin).take(en.len);
@@ -171,10 +172,15 @@ fn complete(
     hash: [u8; 256 / 8],
     out_dir: &str,
     text: bool,
-    store: &Mutex<Vec<TempFile>>)
-    -> Result<()> {
+    store: &Mutex<Vec<TempFile>>,
+) -> Result<()> {
     let encoded_hash = encode_hash(&hash);
-    let written_to = format!("{}/{}/1-{}.lz4", out_dir, &encoded_hash[0..2], &encoded_hash[2..]);
+    let written_to = format!(
+        "{}/{}/1-{}.lz4",
+        out_dir,
+        &encoded_hash[0..2],
+        &encoded_hash[2..]
+    );
     let len = temp.metadata()?.len();
 
     temp.persist(&written_to).expect("rename");

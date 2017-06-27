@@ -32,13 +32,13 @@ fn try_sendfile(src: &File, dest: &MyRawFd, len: u64) -> Result<(), CopyFailure>
         unsafe {
             let offset: *mut i64 = std::ptr::null_mut();
             let to_send: usize = std::cmp::min(std::u32::MAX as u64, remaining) as usize;
-            let sent = libc::sendfile(dest.my_raw_fd(), src.as_raw_fd(),
-                    offset, to_send as usize);
+            let sent = libc::sendfile(dest.my_raw_fd(), src.as_raw_fd(), offset, to_send as usize);
 
             if sent == 0 {
                 return Err(CopyFailure::Errno(io::Error::new(
-                            io::ErrorKind::WriteZero,
-                            "sendfile didn't want to send anything")));
+                    io::ErrorKind::WriteZero,
+                    "sendfile didn't want to send anything",
+                )));
             }
 
             if sent < 0 {
@@ -48,9 +48,8 @@ fn try_sendfile(src: &File, dest: &MyRawFd, len: u64) -> Result<(), CopyFailure>
                         continue;
                     }
 
-                    if len == remaining &&
-                        (libc::EINVAL == code || libc::ENOSYS == code) {
-                            return Err(CopyFailure::Unsupported)
+                    if len == remaining && (libc::EINVAL == code || libc::ENOSYS == code) {
+                        return Err(CopyFailure::Unsupported);
                     }
 
                 }
@@ -68,14 +67,20 @@ fn try_streams(src: &mut File, dest: &mut io::Write, len: u64) -> Result<(), ()>
     Ok(())
 }
 
-pub fn copy_file<T: MyRawFd + io::Write> (src: &mut File, dest: &mut T, len: u64) -> Result<(), io::Error> {
+pub fn copy_file<T: MyRawFd + io::Write>(
+    src: &mut File,
+    dest: &mut T,
+    len: u64,
+) -> Result<(), io::Error> {
     // TODO: copy_file_range
 
     match try_sendfile(src, dest, len) {
         Ok(()) => return Ok(()),
-        Err(fail) => match fail {
-            CopyFailure::Errno(x) => return Err(x),
-            CopyFailure::Unsupported => ()
+        Err(fail) => {
+            match fail {
+                CopyFailure::Errno(x) => return Err(x),
+                CopyFailure::Unsupported => (),
+            }
         }
     };
 

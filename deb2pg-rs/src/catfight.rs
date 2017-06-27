@@ -31,17 +31,22 @@ fn unarchive(root: &str, block_size: u64, offset: u64) -> Result<()> {
     let end = fd.read_u64::<LittleEndian>()?;
     let extra_len = fd.read_u64::<LittleEndian>()?;
 
-    ensure!(end >= 8 + 8,
-            "there isn't even a header, invalid offset?");
+    ensure!(end >= 8 + 8, "there isn't even a header, invalid offset?");
 
-    ensure!(extra_len < std::i64::MAX as u64,
-            "extra length is far too large, invalid offset?");
+    ensure!(
+        extra_len < std::i64::MAX as u64,
+        "extra length is far too large, invalid offset?"
+    );
 
-    ensure!(extra_len <= end - 8 - 8,
-            "too much extra data for record; invalid offset?");
+    ensure!(
+        extra_len <= end - 8 - 8,
+        "too much extra data for record; invalid offset?"
+    );
 
-    ensure!(target_file_offset + end <= file_len,
-            "record extends beyond end of file; invalid offset?");
+    ensure!(
+        target_file_offset + end <= file_len,
+        "record extends beyond end of file; invalid offset?"
+    );
 
     fd.seek(io::SeekFrom::Current(extra_len as i64))?;
 
@@ -69,15 +74,21 @@ fn unlock_flock(what: &File) -> Result<()> {
 }
 
 pub fn store(blocksize: u64, src_path: &str, dest_root: &str, extra: &str) -> Result<u64> {
-    let mut src = File::open(src_path).chain_err(|| "couldn't open source file")?;
+    let mut src = File::open(src_path).chain_err(
+        || "couldn't open source file",
+    )?;
 
-    let src_len: u64 = fs::metadata(src_path).chain_err(|| "couldn't stat source file")?.len();
+    let src_len: u64 = fs::metadata(src_path)
+        .chain_err(|| "couldn't stat source file")?
+        .len();
 
     for target_num in 0..std::u64::MAX {
         let target_path = format!("{}.{:022}", dest_root, target_num);
         let mut fd = std::fs::OpenOptions::new()
-            .write(true).create(true)
-            .open(target_path.as_str()).unwrap();
+            .write(true)
+            .create(true)
+            .open(target_path.as_str())
+            .unwrap();
 
         flock(&fd)?;
 
@@ -87,8 +98,10 @@ pub fn store(blocksize: u64, src_path: &str, dest_root: &str, extra: &str) -> Re
             continue;
         }
 
-        ensure!(0 == file_end % 16,
-            ErrorKind::InvalidState(format!("unaligned file: {}", file_end)));
+        ensure!(
+            0 == file_end % 16,
+            ErrorKind::InvalidState(format!("unaligned file: {}", file_end))
+        );
 
         if 0 == file_end {
             // we locked a new file, write a header
@@ -113,7 +126,9 @@ pub fn store(blocksize: u64, src_path: &str, dest_root: &str, extra: &str) -> Re
         return Ok(file_end);
     }
 
-    Err(ErrorKind::InvalidState("ran out of files".to_string()).into())
+    Err(
+        ErrorKind::InvalidState("ran out of files".to_string()).into(),
+    )
 }
 
 #[cfg(never)]

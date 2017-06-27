@@ -7,7 +7,7 @@ use std::collections::hash_map;
 #[derive(Debug)]
 enum Node {
     Dir(HashMap<String, Node>),
-    File(usize)
+    File(usize),
 }
 
 ///    >>> shortest_match("foo", "bar")
@@ -41,12 +41,14 @@ fn shortest_match(left: &str, right: &str) -> String {
 /// assert_eq!("", find_prefix(['one/two', 'two']));
 /// ```
 fn find_prefix<'a, I>(mut it: I) -> String
-where I: Iterator<Item=&'a String> {
+where
+    I: Iterator<Item = &'a String>,
+{
     let empty_string = String::new();
     let mut prefix: String = it.next().unwrap_or(&empty_string).to_string();
     for item in it {
         if item.starts_with(prefix.as_str()) {
-            continue
+            continue;
         }
         prefix = shortest_match(prefix.as_str(), item);
     }
@@ -75,10 +77,11 @@ fn strip_prefix<T>(off_of: HashMap<String, T>) -> (String, HashMap<String, T>) {
 
 
 fn fixup_path_internal(
-        structure: HashMap<String, Node>,
-        so_far: &[String]) -> Vec<(Vec<String>, usize)> {
-//    >>> list(fixup_path_internal({'a': {'b/c': 3, 'b/d': 4}}, []))
-//    [(['a', 'b/', 'c'], 3), (['a', 'b/', 'd'], 4)]
+    structure: HashMap<String, Node>,
+    so_far: &[String],
+) -> Vec<(Vec<String>, usize)> {
+    //    >>> list(fixup_path_internal({'a': {'b/c': 3, 'b/d': 4}}, []))
+    //    [(['a', 'b/', 'c'], 3), (['a', 'b/', 'd'], 4)]
 
     let mut ret = Vec::new();
 
@@ -90,7 +93,7 @@ fn fixup_path_internal(
             Node::File(pos) => {
                 next.push(item);
                 ret.push((next, pos))
-            },
+            }
             Node::Dir(sub) => {
                 let (prefix, sub) = strip_prefix(sub);
                 next.push(item);
@@ -108,10 +111,9 @@ fn fixup_path_internal(
 }
 
 
-fn fixup_path(structure: HashMap<String, Node>)
-        -> Vec<(Vec<String>, usize)> {
-//    >>> list(fixup_path({'a/b': 3, 'a/c': 4}))
-//    [(['a/', 'b'], 3), (['a/', 'c'], 4)]
+fn fixup_path(structure: HashMap<String, Node>) -> Vec<(Vec<String>, usize)> {
+    //    >>> list(fixup_path({'a/b': 3, 'a/c': 4}))
+    //    [(['a/', 'b'], 3), (['a/', 'c'], 4)]
 
     let (prefix, sub) = strip_prefix(structure);
     if prefix.is_empty() {
@@ -133,7 +135,9 @@ pub fn simplify(input: Vec<Vec<&String>>) -> Vec<Vec<String>> {
 fn add(into: &mut HashMap<String, Node>, remaining: &[&String], pos: usize) {
     match remaining.len() {
         0 => unreachable!(),
-        1 => { into.insert(remaining[0].to_string(), Node::File(pos)); }
+        1 => {
+            into.insert(remaining[0].to_string(), Node::File(pos));
+        }
         _ => {
             match into.entry(remaining[0].to_string()) {
                 hash_map::Entry::Occupied(mut exists) => {
@@ -170,32 +174,33 @@ mod tests {
 
     #[test]
     fn no_change() {
-        assert_identity(&[
-            &["a"],
-            &["b"],
-            &["c"],
-        ]);
+        assert_identity(&[&["a"], &["b"], &["c"]]);
     }
 
     #[test]
     fn trial() {
-        for out in simplify(refify(&to_vec(&[
-            &["some.dsc"],
-            &["foo.tar", "foo-1337/"],
-            &["foo.tar", "foo-1337/Makefile"],
-            &["foo.tar", "foo-1337/src/main.c"],
-            &["foo.tar", "foo-1337/src/help.h"],
-            &["foo.tar", "foo-1337/some.jar", "MANIFEST.MF"],
-            &["other.dsc"]
-        ]))) {
+        for out in simplify(refify(&to_vec(
+            &[
+                &["some.dsc"],
+                &["foo.tar", "foo-1337/"],
+                &["foo.tar", "foo-1337/Makefile"],
+                &["foo.tar", "foo-1337/src/main.c"],
+                &["foo.tar", "foo-1337/src/help.h"],
+                &["foo.tar", "foo-1337/some.jar", "MANIFEST.MF"],
+                &["other.dsc"],
+            ],
+        )))
+        {
             println!("{:?}", out);
         }
     }
 
     fn to_vec(what: &[&[&str]]) -> Vec<Vec<String>> {
-        what.iter().map(|inner|
-            inner.iter().map(|x| x.to_string()).collect::<Vec<String>>()
-        ).collect::<Vec<Vec<String>>>()
+        what.iter()
+            .map(|inner| {
+                inner.iter().map(|x| x.to_string()).collect::<Vec<String>>()
+            })
+            .collect::<Vec<Vec<String>>>()
     }
 
     fn refify(what: &Vec<Vec<String>>) -> Vec<Vec<&String>> {
