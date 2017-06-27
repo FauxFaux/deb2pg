@@ -1,5 +1,6 @@
 extern crate base32;
 extern crate byteorder;
+extern crate catfight;
 extern crate ci_capnp;
 #[macro_use]
 extern crate error_chain;
@@ -11,8 +12,6 @@ extern crate sha2;
 extern crate tempfile;
 extern crate thread_pool;
 
-mod catfight;
-mod copy;
 mod simplify_path;
 mod temps;
 
@@ -264,6 +263,10 @@ mod errors {
                 description("assert!")
                 display("invalid state: {}", msg)
             }
+        }
+
+        links {
+            CatFight(::catfight::Error, ::catfight::ErrorKind);
         }
 
         foreign_links {

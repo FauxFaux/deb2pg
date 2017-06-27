@@ -1,0 +1,9 @@
+[workspace]
+members = [
+    "catfight",
+    "deb2pg",
+]
+
+[profile.release]
+lto = true
+
