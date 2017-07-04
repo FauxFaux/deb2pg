@@ -7,6 +7,7 @@ import sys
 import traceback
 from email.message import Message
 from email.parser import Parser
+import itertools
 
 GEN = os.path.expanduser('~/code/contentin/target/release/ci-gen')
 WRITE = os.path.expanduser('~/code/deb2pg/target/release/deb2pg-ingest')
@@ -41,10 +42,12 @@ def main():
 
 # python3-debian's deb822 is GPL; bastards.
 def deb822(fp) -> Message:
-    signed = subprocess.check_output(['gpg', '-v',
-                                      '--keyring', '/usr/share/keyrings/debian-keyring.gpg'],
-                                     stdin=fp, stderr=subprocess.DEVNULL)
-    return Parser().parsestr(signed.decode('utf-8'), headersonly=True)
+    # signed = subprocess.check_output(['gpg', '-v',
+    #                                   '--keyring', '/usr/share/keyrings/debian-keyring.gpg'],
+    #                                  stdin=fp, stderr=subprocess.DEVNULL)
+    lines = list(itertools.dropwhile(lambda x: x.strip(), fp))
+    msg = ''.join(lines[1:])
+    return Parser().parsestr(msg, headersonly=True)
 
 
 if __name__ == '__main__':
