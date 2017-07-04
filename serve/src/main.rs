@@ -10,6 +10,9 @@ extern crate postgres;
 extern crate r2d2;
 extern crate r2d2_postgres;
 
+use std::collections::HashSet;
+use std::collections::HashMap;
+
 use byteorder::{ByteOrder, LittleEndian};
 
 use iron::prelude::*;
@@ -24,7 +27,38 @@ impl iron::typemap::Key for AppDb {
     type Value = Pool<r2d2_postgres::PostgresConnectionManager>;
 }
 
-fn status(req: &mut Request) -> IronResult<Response> {
+enum Oid {
+    Pos(i64),
+    Hash(i64, i64, i64, i64),
+}
+
+fn oid_from_request(req: &mut Request) -> Option<Oid> {
+    let mut param = req.extensions
+        .get::<Router>()
+        .unwrap()
+        .find("bid")
+        .unwrap()
+        .chars();
+
+    let id_type = param.next().expect("type");
+    if ':' != param.next().expect("colon") {
+        return None;
+    }
+
+    match id_type {
+        'p' => {
+            let parsed = param.collect::<String>().parse::<i64>();
+            match parsed {
+                Ok(val) => Some(Oid::Pos(val)),
+                Err(_) => None,
+            }
+        }
+        'h' => unreachable!(),
+        _ => None,
+    }
+}
+
+fn status(_: &mut Request) -> IronResult<Response> {
     Ok(Response::with((
         status::Ok,
         json!({
@@ -34,23 +68,7 @@ fn status(req: &mut Request) -> IronResult<Response> {
 }
 
 fn blob(req: &mut Request) -> IronResult<Response> {
-    let id: String;
-    let id_type;
-    {
-        let mut param = req.extensions
-            .get::<Router>()
-            .expect("param")
-            .find("id")
-            .expect("id")
-            .chars();
-
-        id_type = param.next().expect("type");
-        if ':' != param.next().expect("colon") {
-            return Ok(Response::with(status::BadRequest));
-        }
-
-        id = param.collect();
-    }
+    let oid = oid_from_request(req).unwrap();
 
     let pool = req.get::<Read<AppDb>>().expect("persistent");
     let conn = pool.get().expect("pool");
@@ -58,11 +76,11 @@ fn blob(req: &mut Request) -> IronResult<Response> {
     let h;
     let p;
     let len;
-    match id_type {
-        'p' => {
+
+    match oid {
+        Oid::Pos(pos) => {
             let stat = conn.prepare_cached("SELECT h0, h1, h2, h3, len FROM blob WHERE pos=$1")
                 .unwrap();
-            let pos = id.parse::<i64>().unwrap();
             let result = stat.query(&[&pos]).unwrap();
             let row = result.get(0);
             h = hex_hash(compose(row.get(0), row.get(1), row.get(2), row.get(3)));
@@ -84,6 +102,73 @@ fn blob(req: &mut Request) -> IronResult<Response> {
         },
         "len": len,
     }).to_string(),
+    )))
+}
+
+fn paths(req: &mut Request) -> IronResult<Response> {
+    let pos = if let Oid::Pos(pos) = oid_from_request(req).unwrap() {
+        pos
+    } else {
+        unimplemented!()
+    };
+
+    let pool = req.get::<Read<AppDb>>().expect("persistent");
+    let conn = pool.get().expect("pool");
+
+    struct First {
+        id: i64,
+        paths: Vec<i64>,
+    }
+
+    let mut first = Vec::new();
+    let mut path_ids = HashSet::new();
+
+    let mut max_id = 0;
+
+    let stat = conn.prepare_cached(
+        "SELECT id, paths FROM file WHERE pos=$1 ORDER BY id LIMIT 501",
+    ).unwrap();
+
+    for row in stat.query(&[&pos]).unwrap().into_iter() {
+        let row = First {
+            id: row.get(0),
+            paths: row.get(1),
+        };
+
+        max_id = row.id;
+
+        for id in &row.paths {
+            path_ids.insert(*id);
+        }
+
+        first.push(row);
+    }
+
+    let stat = conn.prepare_cached("SELECT id, path FROM path_component WHERE id = ANY ($1)")
+        .unwrap();
+
+    let mut id_paths: HashMap<i64, String> = HashMap::with_capacity(path_ids.len());
+
+    for row in stat.query(&[&path_ids.into_iter().collect::<Vec<i64>>()])
+        .unwrap()
+        .into_iter()
+    {
+        id_paths.insert(row.get(0), row.get(1));
+    }
+
+    let paths = first
+        .into_iter()
+        .map(|f| {
+            f.paths.iter().map(|id| id_paths[id].to_string()).collect()
+        })
+        .collect::<Vec<Vec<String>>>();
+
+    Ok(Response::with((
+        status::Ok,
+        ContentType::json().0,
+        json!({
+            "paths": paths,
+        }).to_string(),
     )))
 }
 
@@ -114,7 +199,8 @@ fn main() {
 
     let mut router = Router::new();
     router.get("/ds/status", status, "status");
-    router.get("/ds/blob/:id", blob, "blob-details");
+    router.get("/ds/blob/:bid", blob, "blob-details");
+    router.get("/ds/paths/:bid", paths, "paths");
 
     let (logger_before, logger_after) = logger::Logger::new(None);
 
