@@ -1,0 +1,10 @@
+[package]
+name = "deb2pg-reindex"
+version = "0.1.0"
+authors = ["Chris West (Faux) <git@goeswhere.com>"]
+
+[dependencies]
+catfight = { path = "../catfight" }
+index = { path = "../index" }
+postgres = "0.14.1"
+lz4 = "1.21.0"
