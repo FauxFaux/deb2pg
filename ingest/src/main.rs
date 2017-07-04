@@ -33,7 +33,7 @@ fn run() -> Result<i32> {
     let package_name = env::args().nth(1).unwrap();
     let package_version = env::args().nth(2).unwrap();
 
-    let out_dir = "/var/ftmp/t/".to_string();
+    let out_dir = "/mnt/data/t/".to_string();
     let container_info = format!(
         "{{'type': 'debian', 'package': '{}', 'version': '{}'}}",
         package_name,
@@ -45,7 +45,11 @@ fn run() -> Result<i32> {
     let all_paths = simplify_path::simplify(
         temp_files
             .iter()
-            .map(|temp| temp.header.paths.iter().collect())
+            .map(|temp| {
+                let mut just_paths: Vec<&String> = temp.header.paths.iter().collect();
+                just_paths.reverse();
+                just_paths
+            })
             .collect(),
     );
 
