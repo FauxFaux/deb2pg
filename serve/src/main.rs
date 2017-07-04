@@ -13,26 +13,35 @@ extern crate r2d2_postgres;
 use byteorder::{ByteOrder, LittleEndian};
 
 use iron::prelude::*;
+use iron::headers::ContentType;
 use iron::status;
 use router::Router;
 
 use persistent::Read;
 use r2d2::Pool;
 pub struct AppDb;
-impl iron::typemap::Key for AppDb { type Value = Pool<r2d2_postgres::PostgresConnectionManager>; }
+impl iron::typemap::Key for AppDb {
+    type Value = Pool<r2d2_postgres::PostgresConnectionManager>;
+}
 
 fn status(req: &mut Request) -> IronResult<Response> {
-    Ok(Response::with((status::Ok, json!({
+    Ok(Response::with((
+        status::Ok,
+        json!({
         "broken": true,
-    }).to_string())))
+    }).to_string(),
+    )))
 }
 
 fn blob(req: &mut Request) -> IronResult<Response> {
     let id: String;
     let id_type;
     {
-        let mut param = req.extensions.get::<Router>().expect("param")
-            .find("id").expect("id")
+        let mut param = req.extensions
+            .get::<Router>()
+            .expect("param")
+            .find("id")
+            .expect("id")
             .chars();
 
         id_type = param.next().expect("type");
@@ -51,39 +60,39 @@ fn blob(req: &mut Request) -> IronResult<Response> {
     let len;
     match id_type {
         'p' => {
-            let stat = conn.prepare_cached("SELECT h0, h1, h2, h3, len FROM blob WHERE pos=$1").unwrap();
+            let stat = conn.prepare_cached("SELECT h0, h1, h2, h3, len FROM blob WHERE pos=$1")
+                .unwrap();
             let pos = id.parse::<i64>().unwrap();
             let result = stat.query(&[&pos]).unwrap();
             let row = result.get(0);
-            h = hex_hash(compose([
-                row.get::<usize, i64>(0),
-                row.get::<usize, i64>(1),
-                row.get::<usize, i64>(2),
-                row.get::<usize, i64>(3),
-            ]));
+            h = hex_hash(compose(row.get(0), row.get(1), row.get(2), row.get(3)));
 
             p = format!("{}", pos as u64);
 
             len = row.get::<usize, i64>(4);
         }
-        _ => return Ok(Response::with(status::BadRequest))
+        _ => return Ok(Response::with(status::BadRequest)),
     }
 
-    Ok(Response::with((status::Ok, json!({
+    Ok(Response::with((
+        status::Ok,
+        ContentType::json().0,
+        json!({
         "ids": {
             "h": h,
             "p": p,
         },
         "len": len,
-    }).to_string())))
+    }).to_string(),
+    )))
 }
 
-fn compose(h: [i64; 4]) -> [u8; 256 / 8] {
+fn compose(h0: i64, h1: i64, h2: i64, h3: i64) -> [u8; 256 / 8] {
     let mut hash = [0; 256 / 8];
-    LittleEndian::write_i64(&mut hash[0..8], h[0]);
-    LittleEndian::write_i64(&mut hash[8..16], h[1]);
-    LittleEndian::write_i64(&mut hash[16..24], h[2]);
-    LittleEndian::write_i64(&mut hash[24..32], h[3]);
+    LittleEndian::write_i64(&mut hash[0..8], h0);
+    LittleEndian::write_i64(&mut hash[8..16], h1);
+    LittleEndian::write_i64(&mut hash[16..24], h2);
+    LittleEndian::write_i64(&mut hash[24..32], h3);
     hash
 }
 
@@ -96,7 +105,10 @@ fn main() {
     // 3: debug
     stderrlog::new().verbosity(2).init().unwrap();
 
-    let manager = r2d2_postgres::PostgresConnectionManager::new("postgres://faux@%2Frun%2Fpostgresql", r2d2_postgres::TlsMode::None).unwrap();
+    let manager = r2d2_postgres::PostgresConnectionManager::new(
+        "postgres://faux@%2Frun%2Fpostgresql",
+        r2d2_postgres::TlsMode::None,
+    ).unwrap();
     let config = r2d2::Config::builder().pool_size(8).build();
     let pool = r2d2::Pool::new(config, manager).unwrap();
 
