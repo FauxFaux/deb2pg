@@ -1,3 +1,4 @@
+extern crate byteorder;
 extern crate iron;
 extern crate logger;
 extern crate router;
@@ -8,6 +9,8 @@ extern crate persistent;
 extern crate postgres;
 extern crate r2d2;
 extern crate r2d2_postgres;
+
+use byteorder::{ByteOrder, LittleEndian};
 
 use iron::prelude::*;
 use iron::status;
@@ -46,14 +49,37 @@ fn blob(req: &mut Request) -> IronResult<Response> {
     match id_type {
         'p' => {
             let stat = conn.prepare_cached("SELECT h0, h1, h2, h3, len FROM blob WHERE pos=$1").unwrap();
-            let result = stat.query(&[&id.parse::<i64>().unwrap()]).unwrap();
+            let pos = id.parse::<i64>().unwrap();
+            let result = stat.query(&[&pos]).unwrap();
             let row = result.get(0);
             Ok(Response::with((status::Ok, json!({
-                 "h0": row.get::<usize, i64>(0),
+                "ids": {
+                    "h": hex_hash(compose([
+                        row.get::<usize, i64>(0),
+                        row.get::<usize, i64>(1),
+                        row.get::<usize, i64>(2),
+                        row.get::<usize, i64>(3),
+                    ])),
+                    "p": format!("{}", pos as u64),
+                },
+                "len": row.get::<usize, i64>(4),
             }).to_string())))
         }
         _ => Ok(Response::with(status::BadRequest))
     }
+}
+
+fn compose(h: [i64; 4]) -> [u8; 256 / 8] {
+    let mut hash = [0; 256 / 8];
+    LittleEndian::write_i64(&mut hash[0..8], h[0]);
+    LittleEndian::write_i64(&mut hash[8..16], h[1]);
+    LittleEndian::write_i64(&mut hash[16..24], h[2]);
+    LittleEndian::write_i64(&mut hash[24..32], h[3]);
+    hash
+}
+
+fn hex_hash(hash: [u8; 256 / 8]) -> String {
+    hash.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
 fn main() {

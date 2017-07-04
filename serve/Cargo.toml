@@ -4,6 +4,8 @@ version = "0.1.0"
 authors = ["Chris West (Faux) <git@goeswhere.com>"]
 
 [dependencies]
+byteorder = "1.0.0"
+
 iron = "0.5.1"
 logger = "0.3.0"
 router = "0.5.1"
