@@ -175,6 +175,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "deb2pg-reindex"
+version = "0.1.0"
+dependencies = [
+ "catfight 0.1.0",
+ "index 0.1.0",
+ "lz4 1.21.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "postgres 0.14.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "digest"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

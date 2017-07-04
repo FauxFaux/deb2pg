@@ -45,6 +45,7 @@ where
 {
     pub reader: io::Take<PeekyRead<'a, R>>,
     pub extra: Vec<u8>,
+    pub len: u64,
     realign: u8,
 }
 
@@ -90,8 +91,11 @@ pub fn read_record<R: io::Read>(fd: &mut R) -> Result<Option<Record<R>>> {
     let mut extra = vec![0u8; extra_len as usize];
     fd.read_exact(&mut extra)?;
 
+    let len = end - 8 - 8 - extra_len;
+
     Ok(Some(Record {
-        reader: fd.take(end - 8 - 8 - extra_len),
+        len,
+        reader: fd.take(len),
         extra,
         realign: (align(end) - end) as u8,
     }))

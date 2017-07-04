@@ -3,6 +3,7 @@ members = [
     "catfight",
     "index",
     "ingest",
+    "reindex",
     "serve",
 ]
 

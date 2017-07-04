@@ -29,3 +29,8 @@ CREATE TABLE container (
   ingested TIMESTAMPTZ NOT NULL DEFAULT now(),
   info     JSONB       NOT NULL
 );
+
+CREATE TABLE tri (
+  pos BIGINT NOT NULL,
+  tri INT NOT NULL
+);

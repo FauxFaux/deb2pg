@@ -93,15 +93,14 @@ fn pack(prev: [u8; 3]) -> u32 {
 }
 
 pub fn trigrams_full(input: &str) -> Vec<u32> {
-    if input.len() < 3 {
-        return vec![];
-    }
-
     let mut it = input.chars();
     let mut prev: [u8; 3] = [0; 3];
 
     for i in 0..3 {
-        prev[i] = simplify(it.next().unwrap());
+        prev[i] = simplify(match it.next() {
+            Some(val) => val,
+            None => return Vec::new(),
+        });
     }
 
     let mut found: HashSet<u32> = HashSet::new();

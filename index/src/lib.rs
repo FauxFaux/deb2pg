@@ -13,6 +13,8 @@ mod indexer;
 mod search;
 mod tri;
 
+pub use tri::trigrams_full;
+
 #[cfg(test)]
 mod tests;
 
