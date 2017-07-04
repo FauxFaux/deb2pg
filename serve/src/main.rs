@@ -46,27 +46,36 @@ fn blob(req: &mut Request) -> IronResult<Response> {
     let pool = req.get::<Read<AppDb>>().expect("persistent");
     let conn = pool.get().expect("pool");
 
+    let h;
+    let p;
+    let len;
     match id_type {
         'p' => {
             let stat = conn.prepare_cached("SELECT h0, h1, h2, h3, len FROM blob WHERE pos=$1").unwrap();
             let pos = id.parse::<i64>().unwrap();
             let result = stat.query(&[&pos]).unwrap();
             let row = result.get(0);
-            Ok(Response::with((status::Ok, json!({
-                "ids": {
-                    "h": hex_hash(compose([
-                        row.get::<usize, i64>(0),
-                        row.get::<usize, i64>(1),
-                        row.get::<usize, i64>(2),
-                        row.get::<usize, i64>(3),
-                    ])),
-                    "p": format!("{}", pos as u64),
-                },
-                "len": row.get::<usize, i64>(4),
-            }).to_string())))
+            h = hex_hash(compose([
+                row.get::<usize, i64>(0),
+                row.get::<usize, i64>(1),
+                row.get::<usize, i64>(2),
+                row.get::<usize, i64>(3),
+            ]));
+
+            p = format!("{}", pos as u64);
+
+            len = row.get::<usize, i64>(4);
         }
-        _ => Ok(Response::with(status::BadRequest))
+        _ => return Ok(Response::with(status::BadRequest))
     }
+
+    Ok(Response::with((status::Ok, json!({
+        "ids": {
+            "h": h,
+            "p": p,
+        },
+        "len": len,
+    }).to_string())))
 }
 
 fn compose(h: [i64; 4]) -> [u8; 256 / 8] {
