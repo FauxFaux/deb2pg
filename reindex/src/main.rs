@@ -9,7 +9,7 @@ use std::env;
 use std::fs;
 use std::io;
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 use std::io::Read;
 use std::io::Seek;
@@ -32,7 +32,7 @@ fn main() {
 
     let mut idx = Vec::with_capacity(200_000);
     let mut temp = io::BufWriter::new(tempfile::tempfile().unwrap());
-    let mut seen = HashSet::with_capacity(64*64);
+    let mut seen: HashMap<u32, u32> = HashMap::with_capacity(64*64);
     loop {
         if let Some(mut entry) = catfight::read_record(&mut fp).unwrap() {
             // len is the compressed length, but better than zero
@@ -48,7 +48,8 @@ fn main() {
             tris.sort();
 
             for t in tris {
-                seen.insert(t);
+                *seen.entry(t).or_insert(0) += 1;
+
                 // TODO: this actually should be in platform endian
                 temp.write_u32::<LittleEndian>(t).unwrap();
             }
@@ -78,24 +79,90 @@ fn main() {
 
     println!("{} seen", seen.len());
 
-    for tri in seen {
+    // break seen into blocks of < 1,000,000 positions
+    // scan the file for those seens; by summing all the things in the range of subslice
+    // write those out?
+
+    let mut seen: Vec<(u32, u32)> = seen.iter().map(|x| (*x.0, *x.1)).collect();
+
+    seen.sort();
+
+    let mut seen = seen.iter();
+
+    loop {
+        let mut block = 0usize;
+        let mut tris: HashMap<u32, Vec<u32>> = HashMap::new();
+        loop {
+            let (tri, count) = match seen.next() {
+                Some(t) => (t.0, t.1),
+                None => break,
+            };
+
+            tris.insert(tri, Vec::with_capacity(count as usize));
+
+            // ~ 400MB ram usage?
+            if block > 100_000_000 {
+                break;
+            }
+            block += count as usize;
+        }
+
+        if tris.is_empty() {
+            break;
+        }
+
+        // inclusive
+        let min = *tris.keys().min().unwrap();
+        let max = *tris.keys().max().unwrap();
+
         let mut run = 0usize;
-        let mut poses = Vec::with_capacity(100);
+
         for part in &idx {
             let subslice = &whole[run..(run + (part.len as usize))];
-            if subslice.binary_search(&tri).is_ok() {
-                poses.push(part.pos);
+            let mut start = match subslice.binary_search(&min) {
+                Ok(idx) => idx,
+                Err(idx) => idx,
+            };
+
+            if start > 1 {
+                start -= 2;
+            }
+
+            let end = start + match subslice[start..].binary_search(&max) {
+                Ok(idx) => idx,
+                Err(idx) => idx,
+            } + 1;
+
+            let end = if end > subslice.len() {
+                subslice.len()
+            } else {
+                end
+            };
+
+            if *tris.keys().nth(0).unwrap() == 245316 {
+                println!("searching for {} and {} between {} and {} in {:?} ({} -> {})",
+                         min, max, start, end, &subslice[start..end],
+                        subslice[0], subslice[subslice.len()-1]);
+            }
+
+            for i in start..end {
+                if let Some(v) = tris.get_mut(&subslice[i]) {
+                    v.push(part.pos);
+                }
             }
 
             run += part.len as usize;
         }
 
         assert_eq!(map.len(), run * 4);
-        assert_ne!(0, poses.len());
 
-        out.write_u64::<LittleEndian>(poses.len() as u64).unwrap();
-        for pos in poses {
-            out.write_u32::<LittleEndian>(pos).unwrap();
+        for (tri, poses) in tris {
+            assert_ne!(0, poses.len(), "{}", tri);
+            out.write_u32::<LittleEndian>(tri).unwrap();
+            out.write_u64::<LittleEndian>(poses.len() as u64).unwrap();
+            for pos in poses {
+                out.write_u32::<LittleEndian>(pos).unwrap();
+            }
         }
     }
 }
