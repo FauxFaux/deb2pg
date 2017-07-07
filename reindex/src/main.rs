@@ -9,6 +9,8 @@ use std::env;
 use std::fs;
 use std::io;
 
+use std::collections::HashSet;
+
 use std::io::Read;
 use std::io::Seek;
 use std::io::SeekFrom;
@@ -26,11 +28,14 @@ fn main() {
 
     let mut fp = io::BufReader::new(fs::File::open(&args[1]).unwrap());
     fp.seek(SeekFrom::Start(16)).unwrap();
+    let mut pos = 16;
 
     let mut idx = Vec::with_capacity(200_000);
     let mut temp = io::BufWriter::new(tempfile::tempfile().unwrap());
+    let mut seen = HashSet::with_capacity(64*64);
     loop {
-        let pos = fp.seek(SeekFrom::Current(0)).unwrap();
+        let old_pos = fp.seek(SeekFrom::Current(0)).unwrap();
+        assert_eq!(old_pos, pos);
         if let Some(mut entry) = catfight::read_record(&mut fp).unwrap() {
             // len is the compressed length, but better than zero
             let mut buf = Vec::with_capacity(entry.len as usize);
@@ -43,9 +48,12 @@ fn main() {
             });
 
             for t in tris {
+                seen.insert(t);
                 // TODO: this actually should be in platform endian
                 temp.write_u32::<LittleEndian>(t).unwrap();
             }
+
+            pos += entry.len();
 
             entry.complete().unwrap();
         } else {
@@ -68,16 +76,21 @@ fn main() {
 
     let mut out = io::BufWriter::new(fs::File::create("o").unwrap());
 
-    for tri in 0..(64u32*64*64) {
+    println!("{} seen", seen.len());
+
+    for tri in seen {
         let mut run = 0usize;
         let mut poses = Vec::with_capacity(100);
         for part in &idx {
-            if whole[run..(run+(part.len as usize))].binary_search(&tri).is_ok() {
+            let subslice = &whole[run..(run + (part.len as usize))];
+            if subslice.binary_search(&tri).is_ok() {
                 poses.push(part.pos);
             }
 
             run += part.len as usize;
         }
+
+        assert_eq!(map.len(), run * 4);
 
         println!("{}: {}", tri, poses.len());
 

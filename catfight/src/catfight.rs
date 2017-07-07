@@ -53,6 +53,10 @@ impl<'a, R> Record<'a, R>
 where
     R: std::io::Read,
 {
+    pub fn len(&self) -> u64 {
+        self.extra.len() as u64 + 16 + self.len as u64 + self.realign as u64
+    }
+
     /// Assuming the reader has been consumed, realign us with where the next record should be.
     pub fn complete(mut self) -> Result<()> {
         let mut buf = vec![0u8; self.realign as usize];
