@@ -4,7 +4,9 @@ version = "0.1.0"
 authors = ["Chris West (Faux) <git@goeswhere.com>"]
 
 [dependencies]
+byteorder = "1.0.0"
 catfight = { path = "../catfight" }
 index = { path = "../index" }
-postgres = "0.14.1"
 lz4 = "1.21.0"
+memmap = "0.5.2"
+tempfile = "2.1.5"
