@@ -34,18 +34,18 @@ fn main() {
     let mut temp = io::BufWriter::new(tempfile::tempfile().unwrap());
     let mut seen = HashSet::with_capacity(64*64);
     loop {
-        let old_pos = fp.seek(SeekFrom::Current(0)).unwrap();
-        assert_eq!(old_pos, pos);
         if let Some(mut entry) = catfight::read_record(&mut fp).unwrap() {
             // len is the compressed length, but better than zero
             let mut buf = Vec::with_capacity(entry.len as usize);
             lz4::Decoder::new(&mut entry.reader).unwrap().read_to_end(&mut buf).unwrap();
 
-            let tris = index::trigrams_full(&String::from_utf8_lossy(&buf));
+            let mut tris = index::trigrams_full(&String::from_utf8_lossy(&buf));
             idx.push(Idx {
                 pos: pos as u32,
                 len: tris.len() as u32,
             });
+
+            tris.sort();
 
             for t in tris {
                 seen.insert(t);
@@ -91,8 +91,7 @@ fn main() {
         }
 
         assert_eq!(map.len(), run * 4);
-
-        println!("{}: {}", tri, poses.len());
+        assert_ne!(0, poses.len());
 
         out.write_u64::<LittleEndian>(poses.len() as u64).unwrap();
         for pos in poses {
