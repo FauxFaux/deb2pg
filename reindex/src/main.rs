@@ -120,8 +120,7 @@ fn main() {
         for part in &idx {
             let subslice = &whole[run..(run + (part.len as usize))];
             let mut start = match subslice.binary_search(&min) {
-                Ok(idx) => idx,
-                Err(idx) => idx,
+                Ok(idx) | Err(idx) => idx,
             };
 
             if start > 1 {
@@ -129,8 +128,7 @@ fn main() {
             }
 
             let end = start + match subslice[start..].binary_search(&max) {
-                Ok(idx) => idx,
-                Err(idx) => idx,
+                Ok(idx) | Err(idx) => idx,
             } + 1;
 
             let end = if end > subslice.len() {
@@ -145,8 +143,8 @@ fn main() {
                         subslice[0], subslice[subslice.len()-1]);
             }
 
-            for i in start..end {
-                if let Some(v) = tris.get_mut(&subslice[i]) {
+            for tri in &subslice[start..end] {
+                if let Some(v) = tris.get_mut(tri) {
                     v.push(part.pos);
                 }
             }
