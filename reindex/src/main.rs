@@ -27,8 +27,10 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     let mut fp = io::BufReader::new(fs::File::open(&args[1]).unwrap());
-    fp.seek(SeekFrom::Start(16)).unwrap();
+    let mut out = io::BufWriter::new(fs::File::create(&args[2]).unwrap());
+
     let mut pos = 16;
+    fp.seek(SeekFrom::Start(pos)).unwrap();
 
     let mut idx = Vec::with_capacity(200_000);
     let mut temp = io::BufWriter::new(tempfile::tempfile().unwrap());
@@ -74,8 +76,6 @@ fn main() {
     let map = memmap::Mmap::open(&temp, memmap::Protection::Read).unwrap();
 
     let whole = unsafe { std::slice::from_raw_parts((map.ptr()) as *const u32, map.len() / 4) };
-
-    let mut out = io::BufWriter::new(fs::File::create("o").unwrap());
 
     println!("{} seen", seen.len());
 
@@ -154,12 +154,15 @@ fn main() {
 
         assert_eq!(map.len(), run * 4);
 
-        for (tri, poses) in tris {
-            assert_ne!(0, poses.len(), "{}", tri);
-            out.write_u32::<LittleEndian>(tri).unwrap();
-            out.write_u64::<LittleEndian>(poses.len() as u64).unwrap();
+        for (tri, poses) in &tris {
+            assert_eq!(tris[tri].len(), poses.len(), "{}", tri);
+            out.write_u32::<LittleEndian>(*tri).unwrap();
+
+            assert!(poses.len() <= std::u32::MAX as usize);
+            out.write_u32::<LittleEndian>(poses.len() as u32).unwrap();
+
             for pos in poses {
-                out.write_u32::<LittleEndian>(pos).unwrap();
+                out.write_u32::<LittleEndian>(*pos).unwrap();
             }
         }
     }
