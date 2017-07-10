@@ -31,7 +31,7 @@ fn render_grams_in(vec: &Vec<Op>) -> String {
 impl fmt::Display for Op {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Op::Lit(tri) => write!(f, "{}", tri::explain_packed(tri as usize)),
+            Op::Lit(tri) => write!(f, "{}", tri::explain_packed(tri as u32)),
             Op::And(ref vec) => write!(f, "and({})", render_grams_in(vec)),
             Op::Or(ref vec) => write!(f, "or({})", render_grams_in(vec)),
             Op::Any => write!(f, "FUUUU"),

@@ -14,6 +14,7 @@ mod search;
 mod tri;
 
 pub use tri::trigrams_full;
+pub use tri::explain_packed;
 
 #[cfg(test)]
 mod tests;

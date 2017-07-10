@@ -2,6 +2,7 @@
 members = [
     "catfight",
     "index",
+    "indexstat",
     "ingest",
     "reindex",
     "serve",
