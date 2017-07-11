@@ -1,11 +1,11 @@
 use std;
 
-use std::fs;
 use std::io;
 use std::path;
 use std::slice;
 
 use memmap;
+use names;
 
 const MAX_TRI: u32 = 64 * 64 * 64;
 
@@ -21,26 +21,11 @@ pub struct Index<'i> {
     files: Vec<IndexFile<'i>>,
 }
 
-// TODO: this is awful
-fn addendum_from_path(path: &str) -> u64 {
-    // text-5.0000000000000000000000.idx
-    assert!(path.starts_with("text-"), "path must start with 'text-', not {}", path);
-    let mut it = path.chars().skip("text-".len());
-    let size_raw = it.next().expect("num") as u8 - '2' as u8;
-    assert!(size_raw >= 2 && size_raw <= 9);
-    let size_raw = size_raw as u64;
-    assert_eq!('.', it.next().unwrap());
-
-    // TODO: NO JUST NO WHY
-    it.take("0000000000000000000000".len()).collect::<String>().parse::<u64>().expect("second num")
-        * 1024 * 1024 * 1024 + size_raw - 2 + 8
-}
-
 impl<'i> Index<'i> {
     pub fn open(paths: &[&str]) -> io::Result<Self> {
         let mut files = Vec::with_capacity(paths.len());
         for path in paths {
-            let addendum = addendum_from_path(path::Path::new(path).file_name().unwrap().to_str().unwrap());
+            let addendum = names::addendum_from_path(path::Path::new(path).file_name().unwrap().to_str().unwrap());
             let map = memmap::Mmap::open_path(path, memmap::Protection::Read)?;
 
             assert_eq!(0, map.len() % std::mem::size_of::<u32>());

@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Chris West (Faux) <git@goeswhere.com>"]
 
 [dependencies]
+catfight = { path = "../catfight" }
 index = { path = "../index" }
 byteorder = "1.0.0"
 
@@ -11,6 +12,8 @@ iron = "0.5.1"
 logger = "0.3.0"
 router = "0.5.1"
 persistent = "0.3.0"
+
+lz4 = "1.21.0"
 
 log = "0.3.8"
 stderrlog = "0.2.2"

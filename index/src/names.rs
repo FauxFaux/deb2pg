@@ -1,13 +1,15 @@
 use std::cmp::{min, max};
 
 const BLOCK_SIZE: u64 = 1024 * 1024 * 1024;
+const MIN_SHARD_NO: u8 = 2;
+const SHARD_NO_TEXT_OFFSET: u8 = 8;
 
 fn make_shard_magic(size: u64) -> u8 {
     if 0 == size {
-        return 2;
+        return MIN_SHARD_NO;
     }
 
-    min(9, max(2, (size as f64).log10() as u64)) as u8
+    min(9, max(MIN_SHARD_NO as u64, (size as f64).log10() as u64)) as u8
 }
 
 fn text_otherwise_bin(text: bool) -> &'static str {
@@ -18,21 +20,21 @@ fn text_otherwise_bin(text: bool) -> &'static str {
 pub fn magic_offset(len: u64, text: bool) -> (String, u8) {
     let shard_magic = make_shard_magic(len);
     let shard_name = format!("{}-{}", text_otherwise_bin(text), shard_magic);
-    let shard_id = shard_magic - 2 + if text { 8 } else { 0 };
+    let shard_id = shard_magic - MIN_SHARD_NO + if text { SHARD_NO_TEXT_OFFSET } else { 0 };
     (shard_name, shard_id)
 }
 
 pub fn filename_for(pos: u64) -> (String, u32) {
-    let mut magic = pos % 16;
-    let real_pos = pos - magic;
-    let text = if magic >= 8 {
-        magic -= 8;
+    let mut magic = (pos % 16) as u8;
+    let real_pos = pos - (magic as u64);
+    let text = if magic >= SHARD_NO_TEXT_OFFSET {
+        magic -= SHARD_NO_TEXT_OFFSET;
         true
     } else {
         false
     };
 
-    magic += 2;
+    magic += MIN_SHARD_NO;
 
     let file_number = real_pos / BLOCK_SIZE;
     let file_pos = (real_pos % BLOCK_SIZE) as u32;
@@ -41,6 +43,27 @@ pub fn filename_for(pos: u64) -> (String, u32) {
     (file_name, file_pos)
 }
 
+// TODO: this is awful
+pub fn addendum_from_path(path: &str) -> u64 {
+    // text-5.0000000000000000000000.idx
+    let text = if path.starts_with("text-") {
+        true
+    } else if path.starts_with("bin-") {
+        false
+    } else {
+        panic!("path must start with 'text-' or 'bin-', not {}", path);
+    };
+
+    let mut it = path.chars().skip(if text { 5 } else { 4 });
+    let size_raw = it.next().expect("num") as u8 - '2' as u8;
+    assert!(size_raw >= 2 - 2 && size_raw <= 9 - 2);
+    let size_raw = size_raw as u64;
+    assert_eq!('.', it.next().unwrap());
+
+    // TODO: NO JUST NO WHY
+    it.take("0000000000000000000000".len()).collect::<String>().parse::<u64>().expect("second num")
+        * 1024 * 1024 * 1024 + size_raw + if text { 8 } else { 0 }
+}
 
 #[cfg(test)]
 mod tests {
@@ -89,6 +112,15 @@ mod tests {
         assert_eq!(("text-9.0000000000000000000001".to_string(), 16), filename_for(1024 * 1024 * 1024 + 16 + 15));
 
         assert_eq!(("bin-2.0000000000000000000017".to_string(), 16), filename_for(17 * 1024 * 1024 * 1024 + 16));
+    }
 
+    #[test]
+    fn from_path() {
+        assert_eq!(0, addendum_from_path("bin-2.0000000000000000000000"));
+        assert_eq!(8, addendum_from_path("text-2.0000000000000000000000"));
+        assert_eq!(17 * 1024 * 1024 * 1024, addendum_from_path("bin-2.0000000000000000000017"));
+        assert_eq!(17 * 1024 * 1024 * 1024 + 8, addendum_from_path("text-2.0000000000000000000017"));
+
+        assert_eq!(17 * 1024 * 1024 * 1024 + 9, addendum_from_path("text-3.0000000000000000000017"));
     }
 }

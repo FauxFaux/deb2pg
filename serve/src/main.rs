@@ -1,7 +1,9 @@
 extern crate byteorder;
+extern crate catfight;
 extern crate index;
 extern crate iron;
 extern crate logger;
+extern crate lz4;
 extern crate router;
 #[macro_use]
 extern crate serde_json;
@@ -10,6 +12,12 @@ extern crate persistent;
 extern crate postgres;
 extern crate r2d2;
 extern crate r2d2_postgres;
+
+use std::fs;
+use std::io;
+use std::io::Read as IoRead;
+use std::io::Seek;
+use std::io::SeekFrom;
 
 use std::collections::HashSet;
 use std::collections::HashMap;
@@ -110,7 +118,22 @@ fn cat(req: &mut Request) -> IronResult<Response> {
     let oid = oid_from_request(req).unwrap();
     match oid {
         Oid::Pos(i) => {
-            unimplemented!();
+            let (name, off) = index::names::filename_for(i as u64);
+            println!("{} {}", name, off);
+            let mut fd = fs::File::open(format!("/mnt/data/t/{}", name)).unwrap();
+            fd.seek(SeekFrom::Start(off as u64)).unwrap();
+            let mut data = Vec::new();
+            if let Some(mut record) = catfight::read_record(&mut fd).unwrap() {
+                lz4::Decoder::new(&mut record.reader).expect("lz4").read_to_end(&mut data).expect("read");
+                record.complete().expect("complete");
+            } else {
+                panic!()
+            }
+            Ok(Response::with((
+                status::Ok,
+                ContentType::plaintext().0,
+                data,
+            )))
         },
         _ => unimplemented!(),
     }
