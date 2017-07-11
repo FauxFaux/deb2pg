@@ -8,6 +8,7 @@ extern crate memmap;
 extern crate regex_syntax;
 
 pub mod find;
+pub mod names;
 mod search;
 mod tri;
 

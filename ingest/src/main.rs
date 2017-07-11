@@ -4,6 +4,7 @@ extern crate catfight;
 extern crate ci_capnp;
 #[macro_use]
 extern crate error_chain;
+extern crate index;
 extern crate lz4;
 extern crate num_cpus;
 extern crate postgres;
@@ -164,9 +165,7 @@ SELECT pg_advisory_unlock(18787)
         ));
     }
 
-    let shard_no = make_shard_no(file.header.len);
-    let shard_name = format!("{}-{}", if file.text { "text" } else { "bin" }, shard_no);
-    let shard_id = shard_no - 2 + if file.text { 8 } else { 0 };
+    let (shard_name, shard_id) = index::names::magic_offset(file.header.len, file.text);
 
     let pos = (shard_id as u64) +
         catfight::store(
@@ -205,11 +204,6 @@ SELECT pos FROM blob WHERE h0=$1 AND h1=$2 AND h2=$3 AND h3=$4 AND len=$5
     Ok(result.iter().next().map(
         |row| row.get::<usize, i64>(0) as u64,
     ))
-}
-
-fn make_shard_no(size: u64) -> u8 {
-    use std::cmp::{min, max};
-    min(9, max(2, (size as f64).log10() as u64)) as u8
 }
 
 fn decompose(hash: [u8; 256 / 8]) -> (i64, i64, i64, i64) {
