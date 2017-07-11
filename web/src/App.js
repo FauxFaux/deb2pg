@@ -1,9 +1,12 @@
 import React, { Component } from 'react';
+import Highlight from 'react-fast-highlight';
+
 import logo from './logo.svg';
 import './App.css';
 
 class App extends Component {
   render() {
+    const code = '#include <foo.h>\nint main() {\n   return 0;\n}\n';
     return (
       <div className="App">
         <div className="App-header">
@@ -13,6 +16,9 @@ class App extends Component {
         <p className="App-intro">
           To get started, edit <code>src/App.js</code> and save to reload.
         </p>
+        <Highlight languages={['c']}>
+            {code}
+        </Highlight>
       </div>
     );
   }
