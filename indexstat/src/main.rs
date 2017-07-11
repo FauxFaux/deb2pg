@@ -16,7 +16,7 @@ where R: Seek + Read {
     let tri = fp.read_u32::<LittleEndian>()?;
     let len = fp.read_u32::<LittleEndian>()? as usize;
     fp.seek(SeekFrom::Current(len as i64 * 4))?;
-    println!("{:4} {}", len, index::explain_packed(tri));
+    println!("{:4} {} {}", len, tri, index::explain_packed(tri));
     Ok(())
 }
 

@@ -106,6 +106,17 @@ fn blob(req: &mut Request) -> IronResult<Response> {
     )))
 }
 
+fn cat(req: &mut Request) -> IronResult<Response> {
+    let oid = oid_from_request(req).unwrap();
+    match oid {
+        Oid::Pos(i) => {
+            unimplemented!();
+        },
+        _ => unimplemented!(),
+    }
+
+}
+
 fn paths(req: &mut Request) -> IronResult<Response> {
     let pos = if let Oid::Pos(pos) = oid_from_request(req).unwrap() {
         pos
@@ -174,10 +185,18 @@ fn paths(req: &mut Request) -> IronResult<Response> {
     )))
 }
 
-fn docs(req: &mut Request) -> IronResult<Response> {
+fn tri_num(req: &mut Request) -> IronResult<Response> {
+    let tri = req.extensions
+        .get::<Router>()
+        .unwrap()
+        .find("num")
+        .unwrap()
+        .parse::<u32>()
+        .unwrap();
+
     let paths = ["/mnt/data/t/text-5.0000000000000000000000.idx"];
     let index = index::find::Index::open(&paths).expect("open");
-    let docs = index.documents_for_tri(3);
+    let docs = index.documents_for_tri(tri);
     Ok(Response::with((
         status::Ok,
         ContentType::json().0,
@@ -215,10 +234,11 @@ fn main() {
     let mut router = Router::new();
     router.get("/ds/status", status, "status");
     router.get("/ds/blob/:bid", blob, "blob-details");
+    router.get("/ds/cat/:bid", cat, "blob-contents");
     router.get("/ds/paths/:bid", paths, "paths");
 
     // Debug:
-    router.get("/ds/docs/:tri", docs, "docs");
+    router.get("/ds/trinum/:num", tri_num, "trinum");
 
     let (logger_before, logger_after) = logger::Logger::new(None);
 
