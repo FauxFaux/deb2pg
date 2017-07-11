@@ -137,12 +137,6 @@ fn main() {
                 end
             };
 
-            if *tris.keys().nth(0).unwrap() == 245316 {
-                println!("searching for {} and {} between {} and {} in {:?} ({} -> {})",
-                         min, max, start, end, &subslice[start..end],
-                        subslice[0], subslice[subslice.len()-1]);
-            }
-
             for tri in &subslice[start..end] {
                 if let Some(v) = tris.get_mut(tri) {
                     v.push(part.pos);
@@ -166,4 +160,8 @@ fn main() {
             }
         }
     }
+
+    // zeroth's trigram has zero items
+    out.write_u32::<LittleEndian>(0).unwrap();
+    out.write_u32::<LittleEndian>(0).unwrap();
 }

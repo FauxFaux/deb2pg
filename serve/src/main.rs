@@ -1,4 +1,5 @@
 extern crate byteorder;
+extern crate index;
 extern crate iron;
 extern crate logger;
 extern crate router;
@@ -135,6 +136,7 @@ fn paths(req: &mut Request) -> IronResult<Response> {
             paths: row.get(1),
         };
 
+        // TODO: paging
         max_id = row.id;
 
         for id in &row.paths {
@@ -172,6 +174,19 @@ fn paths(req: &mut Request) -> IronResult<Response> {
     )))
 }
 
+fn docs(req: &mut Request) -> IronResult<Response> {
+    let paths = ["/mnt/data/t/text-5.0000000000000000000000.idx"];
+    let index = index::find::Index::open(&paths).expect("open");
+    let docs = index.documents_for_tri(3);
+    Ok(Response::with((
+        status::Ok,
+        ContentType::json().0,
+        json!({
+            "docs": docs,
+        }).to_string(),
+    )))
+}
+
 fn compose(h0: i64, h1: i64, h2: i64, h3: i64) -> [u8; 256 / 8] {
     let mut hash = [0; 256 / 8];
     LittleEndian::write_i64(&mut hash[0..8], h0);
@@ -201,6 +216,9 @@ fn main() {
     router.get("/ds/status", status, "status");
     router.get("/ds/blob/:bid", blob, "blob-details");
     router.get("/ds/paths/:bid", paths, "paths");
+
+    // Debug:
+    router.get("/ds/docs/:tri", docs, "docs");
 
     let (logger_before, logger_after) = logger::Logger::new(None);
 

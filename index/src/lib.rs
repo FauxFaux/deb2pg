@@ -1,15 +1,13 @@
-#![feature(decode_utf8)]
-#![feature(io)]
-
 extern crate bit_set;
 extern crate byteorder;
 #[macro_use]
 extern crate error_chain;
 extern crate libc;
 extern crate lz4;
+extern crate memmap;
 extern crate regex_syntax;
 
-mod indexer;
+pub mod find;
 mod search;
 mod tri;
 

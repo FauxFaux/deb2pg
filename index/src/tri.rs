@@ -1,12 +1,4 @@
-use std::result;
-use std::io;
 use std::collections::HashSet;
-
-use bit_set::BitSet;
-
-use errors::*;
-
-pub type CharResult = result::Result<char, io::CharsError>;
 
 fn simplify(wut: char) -> u8 {
     let c = match wut {
@@ -115,6 +107,10 @@ pub fn trigrams_full(input: &str) -> Vec<u32> {
     found.into_iter().collect()
 }
 
+#[cfg(never)]
+pub type CharResult = result::Result<char, io::CharsError>;
+
+#[cfg(never)]
 pub fn trigrams_for<T: Iterator<Item = CharResult>>(input: T) -> Result<BitSet> {
     let mut line: u64 = 1;
     let mut prev: [u8; 3] = [0; 3];
