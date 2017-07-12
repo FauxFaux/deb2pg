@@ -5,6 +5,7 @@
   "dependencies": {
     "axios": "^0.16.2",
     "react": "^15.6.1",
+    "react-document-title": "^2.0.3",
     "react-dom": "^15.6.1",
     "react-fast-highlight": "^2.1.1",
     "react-router": "^4.1.1",

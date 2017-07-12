@@ -1,5 +1,7 @@
 import React, { Component } from 'react';
+import DocumentTitle from 'react-document-title';
 import Highlight from 'react-fast-highlight';
+
 import axios from 'axios';
 
 import Paths from './Paths';
@@ -22,12 +24,17 @@ class Blob extends Component {
 
   render() {
     return (
-      <div>
-        <Paths id={this.props.match.params.id}/>
-        <Highlight languages={['c', 'xml', 'perl']}>
-          {this.state.doc}
-        </Highlight>
-      </div>
+      <DocumentTitle title={'DXR: contents: ' + this.props.match.params.id}>
+        <div>
+          <h2>Names</h2>
+          <Paths id={this.props.match.params.id}/>
+
+          <h2>Contents</h2>
+          <Highlight languages={['xml', 'perl', 'cpp']}>
+            {this.state.doc}
+          </Highlight>
+        </div>
+      </DocumentTitle>
     );
   }
 }

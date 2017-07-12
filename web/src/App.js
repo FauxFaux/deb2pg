@@ -1,25 +1,14 @@
 import React, { Component } from 'react';
-import Highlight from 'react-fast-highlight';
+import DocumentTitle from 'react-document-title';
 
-import logo from './logo.svg';
 import './App.css';
 
 class App extends Component {
   render() {
-    const code = '#include <foo.h>\nint main() {\n   return 0;\n}\n';
     return (
-      <div className="App">
-        <div className="App-header">
-          <img src={logo} className="App-logo" alt="logo" />
-          <h2>Welcome to React</h2>
-        </div>
-        <p className="App-intro">
-          To get started, edit <code>src/App.js</code> and save to reload.
-        </p>
-        <Highlight languages={['c']}>
-            {code}
-        </Highlight>
-      </div>
+      <DocumentTitle title='DXR'>
+        <span>Hello, world!</span>
+      </DocumentTitle>
     );
   }
 }
