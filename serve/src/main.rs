@@ -229,6 +229,25 @@ fn tri_num(req: &mut Request) -> IronResult<Response> {
     )))
 }
 
+fn search(req: &mut Request) -> IronResult<Response> {
+    let term = req.extensions
+        .get::<Router>()
+        .unwrap()
+        .find("term")
+        .unwrap();
+
+    let paths = ["/mnt/data/t/text-5.0000000000000000000000.idx"];
+    let index = index::find::Index::open(&paths).expect("open");
+    let docs = index.documents_for_search(term);
+    Ok(Response::with((
+        status::Ok,
+        ContentType::json().0,
+        json!({
+            "docs": docs,
+        }).to_string(),
+    )))
+}
+
 fn compose(h0: i64, h1: i64, h2: i64, h3: i64) -> [u8; 256 / 8] {
     let mut hash = [0; 256 / 8];
     LittleEndian::write_i64(&mut hash[0..8], h0);
@@ -259,6 +278,7 @@ fn main() {
     router.get("/ds/blob/:bid", blob, "blob-details");
     router.get("/ds/cat/:bid", cat, "blob-contents");
     router.get("/ds/paths/:bid", paths, "paths");
+    router.get("/ds/search/:term", search, "search");
 
     // Debug:
     router.get("/ds/trinum/:num", tri_num, "trinum");

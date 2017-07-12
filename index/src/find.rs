@@ -4,8 +4,11 @@ use std::io;
 use std::path;
 use std::slice;
 
+use std::collections::HashSet;
+
 use memmap;
 use names;
+use tri;
 
 const MAX_TRI: u32 = 64 * 64 * 64;
 
@@ -70,5 +73,32 @@ impl<'i> Index<'i> {
             all.extend(file.by_tri[tri as usize].iter().map(|x| *x as u64 + file.addendum));
         }
         all
+    }
+
+    pub fn documents_for_search(&self, search: &str) -> Vec<u64> {
+        let mut matched = Vec::new();
+        let target = tri::trigrams_full(search);
+        for file in &self.files {
+            let mut it = target.iter();
+            let mut this_file: HashSet<u32> = match it.next() {
+                Some(first) => file.by_tri[*first as usize].iter().map(|x| *x).collect(),
+                None => continue,
+            };
+
+            // TODO: obviously this is dumb; they're pre-sorted
+            while let Some(next) = it.next() {
+                let next_set: HashSet<u32> = file.by_tri[*next as usize].iter().map(|x| *x).collect();
+                this_file.retain(|x| next_set.contains(x));
+                if this_file.is_empty() {
+                    break;
+                }
+            }
+
+            for local in this_file {
+                matched.push(local as u64 + file.addendum);
+            }
+
+        }
+        matched
     }
 }

@@ -41,7 +41,7 @@ fn main() {
             let mut buf = Vec::with_capacity(entry.len as usize);
             lz4::Decoder::new(&mut entry.reader).unwrap().read_to_end(&mut buf).unwrap();
 
-            let mut tris = index::trigrams_full(&String::from_utf8_lossy(&buf));
+            let mut tris: Vec<u32> = index::trigrams_full(&String::from_utf8_lossy(&buf)).into_iter().collect();
             idx.push(Idx {
                 pos: pos as u32,
                 len: tris.len() as u32,

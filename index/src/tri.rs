@@ -84,14 +84,14 @@ fn pack(prev: [u8; 3]) -> u32 {
     64 * 64 * prev[0] as u32 + 64 * prev[1] as u32 + prev[2] as u32
 }
 
-pub fn trigrams_full(input: &str) -> Vec<u32> {
+pub fn trigrams_full(input: &str) -> HashSet<u32> {
     let mut it = input.chars();
     let mut prev: [u8; 3] = [0; 3];
 
     for i in 0..3 {
         prev[i] = simplify(match it.next() {
             Some(val) => val,
-            None => return Vec::new(),
+            None => return HashSet::new(),
         });
     }
 
@@ -104,7 +104,7 @@ pub fn trigrams_full(input: &str) -> Vec<u32> {
         found.insert(pack(prev));
     }
 
-    found.into_iter().collect()
+    found
 }
 
 #[cfg(never)]
