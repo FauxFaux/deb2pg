@@ -36,6 +36,11 @@ impl iron::typemap::Key for AppDb {
     type Value = Pool<r2d2_postgres::PostgresConnectionManager>;
 }
 
+pub struct AppIndex;
+impl iron::typemap::Key for AppIndex {
+    type Value = index::find::Index<'static>;
+}
+
 enum Oid {
     Pos(i64),
     Hash(i64, i64, i64, i64),
@@ -217,8 +222,8 @@ fn tri_num(req: &mut Request) -> IronResult<Response> {
         .parse::<u32>()
         .unwrap();
 
-    let paths = ["/mnt/data/t/text-5.0000000000000000000000.idx"];
-    let index = index::find::Index::open(&paths).expect("open");
+    let index = req.get::<Read<AppIndex>>().expect("persistent");
+
     let docs = index.documents_for_tri(tri);
     Ok(Response::with((
         status::Ok,
@@ -234,11 +239,11 @@ fn search(req: &mut Request) -> IronResult<Response> {
         .get::<Router>()
         .unwrap()
         .find("term")
-        .unwrap();
+        .unwrap()
+        .to_string();
 
-    let paths = ["/mnt/data/t/text-5.0000000000000000000000.idx"];
-    let index = index::find::Index::open(&paths).expect("open");
-    let docs = index.documents_for_search(term);
+    let index = req.get::<Read<AppIndex>>().expect("persistent");
+    let docs = index.documents_for_search(&term);
     Ok(Response::with((
         status::Ok,
         ContentType::json().0,
@@ -272,6 +277,22 @@ fn main() {
     ).unwrap();
     let config = r2d2::Config::builder().pool_size(8).build();
     let pool = r2d2::Pool::new(config, manager).unwrap();
+    std::mem::drop(pool.get().unwrap());
+
+    let index = {
+        let mut paths = Vec::new();
+        for file in fs::read_dir("/mnt/data/t").unwrap() {
+            let path = file.unwrap().path();
+            if path.extension().unwrap().to_str().unwrap() == "idx" {
+                paths.push(path);
+            }
+        }
+
+        println!("{} paths found; going to open index...", paths.len());
+        index::find::Index::open(&paths).unwrap()
+    };
+
+    println!("index loaded");
 
     let mut router = Router::new();
     router.get("/ds/status", status, "status");
@@ -288,6 +309,7 @@ fn main() {
     let mut chain = Chain::new(router);
     chain.link_before(logger_before);
     chain.link(Read::<AppDb>::both(pool));
+    chain.link(Read::<AppIndex>::both(index));
     chain.link_after(logger_after);
 
     Iron::new(chain).http("localhost:6918").unwrap();

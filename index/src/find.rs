@@ -25,10 +25,10 @@ pub struct Index<'i> {
 }
 
 impl<'i> Index<'i> {
-    pub fn open(paths: &[&str]) -> io::Result<Self> {
+    pub fn open(paths: &[path::PathBuf]) -> io::Result<Self> {
         let mut files = Vec::with_capacity(paths.len());
         for path in paths {
-            let addendum = names::addendum_from_path(path::Path::new(path).file_name().unwrap().to_str().unwrap());
+            let addendum = names::addendum_from_path(path.file_name().unwrap().to_str().unwrap());
             let map = memmap::Mmap::open_path(path, memmap::Protection::Read)?;
 
             assert_eq!(0, map.len() % std::mem::size_of::<u32>());
