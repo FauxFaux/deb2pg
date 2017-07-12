@@ -2,6 +2,8 @@ import React, { Component } from 'react';
 import Highlight from 'react-fast-highlight';
 import axios from 'axios';
 
+import Paths from './Paths';
+
 class Blob extends Component {
   constructor(props) {
     super(props);
@@ -20,9 +22,12 @@ class Blob extends Component {
 
   render() {
     return (
-      <Highlight languages={['c', 'xml', 'perl']}>
-        {this.state.doc}
-      </Highlight>
+      <div>
+        <Paths id={this.props.match.params.id}/>
+        <Highlight languages={['c', 'xml', 'perl']}>
+          {this.state.doc}
+        </Highlight>
+      </div>
     );
   }
 }
