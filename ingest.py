@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+# rm ingest.log; rm ~/failure.log; time find /mnt/data/sources -name \*.dsc -print0 | nice ionice xargs -0P8 -n20 python3 ingest.py 2>&1 | tee -a ingest.log
+
+import itertools
 import os
 import re
 import subprocess
@@ -7,7 +10,6 @@ import sys
 import traceback
 from email.message import Message
 from email.parser import Parser
-import itertools
 
 GEN = os.path.expanduser('~/code/contentin/target/release/ci-gen')
 WRITE = os.path.expanduser('~/code/deb2pg/target/release/deb2pg-ingest')
@@ -29,9 +31,9 @@ def main():
             gen = subprocess.Popen([GEN] + files, cwd=in_dir, stdout=subprocess.PIPE)
             consume = subprocess.Popen([WRITE, name, version], stdin=gen.stdout)
 
-            if 0 != gen.wait(120):
+            if 0 != gen.wait(180):
                 raise Exception('gen failed')
-            if 0 != consume.wait(60):
+            if 0 != consume.wait(120):
                 raise Exception('consume failed')
 
         except Exception as e:

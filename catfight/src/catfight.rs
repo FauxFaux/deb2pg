@@ -169,7 +169,7 @@ pub fn store(blocksize: u64, src: &mut File, dest_root: &str, extra: &[u8]) -> R
 
         copy_file(src, &mut fd, src_len)?;
 
-        return Ok(file_end);
+        return Ok(target_num * blocksize + file_end);
     }
 
     Err(

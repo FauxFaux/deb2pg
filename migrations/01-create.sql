@@ -10,6 +10,7 @@ CREATE TABLE blob (
 );
 
 CREATE INDEX blob_h0_key ON blob (h0);
+CREATE UNIQUE INDEX blob_pos ON blob(pos) WHERE pos IS NOT NULL;
 
 CREATE TABLE path_component (
   id   BIGSERIAL PRIMARY KEY,
@@ -28,9 +29,4 @@ CREATE TABLE container (
   id       BIGSERIAL PRIMARY KEY,
   ingested TIMESTAMPTZ NOT NULL DEFAULT now(),
   info     JSONB       NOT NULL
-);
-
-CREATE TABLE tri (
-  pos BIGINT NOT NULL,
-  tri INT NOT NULL
 );
