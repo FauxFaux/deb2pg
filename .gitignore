@@ -10,3 +10,4 @@ bin-?.*
 text-?.*
 out
 target
+logs
