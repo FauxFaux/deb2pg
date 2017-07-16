@@ -18,7 +18,7 @@ cp -a --reflink=auto /usr/share/keyrings/debian-archive-keyring.gpg etc/apt/trus
 
 for dist in stable testing unstable experimental; do
     for prefix in 'deb' 'deb-src'; do
-        echo ${prefix}' http://httpredir.debian.org/debian/ '${dist}' main'
+        echo ${prefix}' http://deb.debian.org/debian/ '${dist}' main'
     done
 done > etc/apt/sources.list
 
