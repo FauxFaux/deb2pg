@@ -41,19 +41,44 @@ impl<'i> Index<'i> {
 
             let mut cur = 0;
             loop {
-                if cur == nums_len {
+                // block header / guard
+                let start = raw[cur];
+                cur += 1;
+
+                if 0 == start {
+                    assert_eq!(cur, nums_len);
                     break;
                 }
 
-                let tri = raw[cur];
+                assert_eq!(0xD81F, start, "{}", cur);
+
+                assert_eq!(0, raw[cur]);
+                cur += 1;
+                assert_eq!(0, raw[cur]);
                 cur += 1;
 
-                let len = raw[cur];
+                // header length, in records
+                let block_len = raw[cur];
                 cur += 1;
 
-                by_tri[tri as usize] = &raw[cur..(len as usize + cur)];
+                let mut block_cur = cur;
 
-                cur += len as usize;
+                cur += 2 * block_len as usize;
+
+                // load all the headers,
+                // cur is updated to skip over all the data
+                for _ in 0..block_len {
+                    let tri = raw[block_cur];
+                    block_cur += 1;
+
+                    let len = raw[block_cur];
+                    block_cur += 1;
+
+                    by_tri[tri as usize] = &raw[cur..(len as usize + cur)];
+
+                    cur += len as usize;
+                }
+
             }
 
             files.push(IndexFile {

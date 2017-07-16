@@ -197,6 +197,9 @@ fn main() {
         // poses: ..just the raw data
 
         // num headers
+        out.write_u32::<LittleEndian>(0xD81F).unwrap();
+        out.write_u32::<LittleEndian>(0).unwrap();
+        out.write_u32::<LittleEndian>(0).unwrap();
         out.write_u32::<LittleEndian>(tri_poses.len() as u32).unwrap();
 
         for tri in &tris {
@@ -209,9 +212,6 @@ fn main() {
 
         for tri in tris {
             let poses = &tri_poses[&tri];
-
-            assert!(poses.len() <= std::u32::MAX as usize);
-            out.write_u32::<LittleEndian>(poses.len() as u32).unwrap();
 
             for pos in poses {
                 out.write_u32::<LittleEndian>(*pos).unwrap();
