@@ -38,7 +38,7 @@ fn convert_pack_to_just_trigrams<R: Read + Seek>(mut pack: R) -> (fs::File, Vec<
 
     let mut temp = io::BufWriter::new(tempfile::tempfile().unwrap());
     let mut temp_index = Vec::with_capacity(200_000);
-    let mut trigram_count: HashMap<Tri, u32> = HashMap::with_capacity(64*64);
+    let mut trigram_count: HashMap<Tri, u32> = HashMap::with_capacity(64*64*64);
 
     loop {
         if let Some(mut entry) = catfight::read_record(&mut pack).unwrap() {
@@ -83,7 +83,7 @@ fn take_some<I>(trigram_count: &mut I) -> HashMap<Tri, Vec<Pos>>
         I: Iterator<Item=(Tri, Count)>
 {
     let mut block = 0usize;
-    let mut tris: HashMap<Tri, Vec<Pos>> = HashMap::new();
+    let mut tris: HashMap<Tri, Vec<Pos>> = HashMap::with_capacity(128);
     loop {
         let (tri, count) = match trigram_count.next() {
             Some(t) => (t.0, t.1),
@@ -99,6 +99,7 @@ fn take_some<I>(trigram_count: &mut I) -> HashMap<Tri, Vec<Pos>>
         block += count as usize;
     }
 
+    tris.shrink_to_fit();
     tris
 }
 
@@ -156,14 +157,16 @@ fn main() {
     // remembering where those trigrams referred to, stored in a `temp`orary file.
     let (temp, temp_index, trigram_count) = convert_pack_to_just_trigrams(fp);
 
-    // ..which we immediately map into memory as an array of Tri(u32)s.
-    let map = memmap::Mmap::open(&temp, memmap::Protection::Read).unwrap();
-    let temp_data = unsafe { std::slice::from_raw_parts((map.ptr()) as *const Tri, map.len() / 4) };
 
     // Sort the trigrams we've seen by number.
     let mut trigram_count: Vec<(Tri, Count)> = trigram_count.into_iter().map(|x| (x.0, x.1)).collect();
     trigram_count.sort();
     let mut trigram_count = trigram_count.into_iter();
+
+
+    // ..which we immediately map into memory as an array of Tri(u32)s.
+    let map = memmap::Mmap::open(&temp, memmap::Protection::Read).unwrap();
+    let temp_data = unsafe { std::slice::from_raw_parts((map.ptr()) as *const Tri, map.len() / 4) };
 
 
     // Now, we want to transpose [{A, B, C}, {A, C, E}] into [A: {1, 2}, B: {1}, C: {1, 2}, E: {2}]
@@ -173,19 +176,39 @@ fn main() {
     loop {
 
         // Select a block of trigrams to process, and allocate space for their documents.
-        let mut tris = take_some(&mut trigram_count);
+        let mut tri_poses = take_some(&mut trigram_count);
 
-        if tris.is_empty() {
+        if tri_poses.is_empty() {
             break;
         }
 
         // Fetch the document ids for each of the selected trigrams, by scanning the temp data.
-        fill_tris(&temp_index, &temp_data, &mut tris);
+        fill_tris(&temp_index, &temp_data, &mut tri_poses);
+
+        let mut tris: Vec<Tri> = tri_poses.keys().map(|x| *x).collect();
+        tris.sort();
 
         // Write them out.
-        for (tri, poses) in &tris {
-            assert_eq!(tris[tri].len(), poses.len(), "{}", tri);
+
+        // Format (everything is a u32):
+        // file: [block] [block..] 0
+        // block: [num headers] [header] [header..] [poses] [poses..]
+        // header: [tri] [num tris]
+        // poses: ..just the raw data
+
+        // num headers
+        out.write_u32::<LittleEndian>(tri_poses.len() as u32).unwrap();
+
+        for tri in &tris {
             out.write_u32::<LittleEndian>(*tri).unwrap();
+
+            let poses = &tri_poses[tri];
+            assert!(poses.len() <= std::u32::MAX as usize);
+            out.write_u32::<LittleEndian>(poses.len() as u32).unwrap();
+        }
+
+        for tri in tris {
+            let poses = &tri_poses[&tri];
 
             assert!(poses.len() <= std::u32::MAX as usize);
             out.write_u32::<LittleEndian>(poses.len() as u32).unwrap();
@@ -196,7 +219,6 @@ fn main() {
         }
     }
 
-    // zeroth's trigram has zero items
-    out.write_u32::<LittleEndian>(0).unwrap();
+    // zero item header -> end of file
     out.write_u32::<LittleEndian>(0).unwrap();
 }

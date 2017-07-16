@@ -1,4 +1,4 @@
 # a=(text-*); make -j 8 -f ~/code/deb2pg/reindex/Makefile.index ${a[@]/%/.idx}
 
 text-%.idx: text-%
-	deb2pg-reindex $^ $@
+	nice ionice deb2pg-reindex $^ $@
