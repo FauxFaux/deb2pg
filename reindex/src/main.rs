@@ -23,18 +23,13 @@ struct Idx {
     len: u32,
 }
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
-
-    let mut fp = io::BufReader::new(fs::File::open(&args[1]).unwrap());
-    let mut out = io::BufWriter::new(fs::File::create(&args[2]).unwrap());
-
+fn read_pack<R: Read + Seek>(mut fp: R) -> (Vec<Idx>, HashMap<u32, u32>, fs::File) {
     let mut pos = 16;
     fp.seek(SeekFrom::Start(pos)).unwrap();
-
     let mut idx = Vec::with_capacity(200_000);
     let mut temp = io::BufWriter::new(tempfile::tempfile().unwrap());
     let mut seen: HashMap<u32, u32> = HashMap::with_capacity(64*64);
+
     loop {
         if let Some(mut entry) = catfight::read_record(&mut fp).unwrap() {
             // len is the compressed length, but better than zero
@@ -73,15 +68,22 @@ fn main() {
 
     temp.flush().unwrap();
 
+    (idx, seen, temp)
+}
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+
+    let fp = io::BufReader::new(fs::File::open(&args[1]).unwrap());
+    let mut out = io::BufWriter::new(fs::File::create(&args[2]).unwrap());
+
+    let (idx, seen, temp) = read_pack(fp);
+
     let map = memmap::Mmap::open(&temp, memmap::Protection::Read).unwrap();
 
     let whole = unsafe { std::slice::from_raw_parts((map.ptr()) as *const u32, map.len() / 4) };
 
     println!("{} seen", seen.len());
-
-    // break seen into blocks of < 1,000,000 positions
-    // scan the file for those seens; by summing all the things in the range of subslice
-    // write those out?
 
     let mut seen: Vec<(u32, u32)> = seen.iter().map(|x| (*x.0, *x.1)).collect();
 
