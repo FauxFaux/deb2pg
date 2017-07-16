@@ -32,7 +32,7 @@ struct TempFileChunk {
 /// then for the second, ...
 /// The returned `temp_index` of chunks stores their length, and which chunk-relative 'pos' they refer to
 /// The `trigram_count` for every trigram is also recorded.
-fn read_pack<R: Read + Seek>(mut pack: R) -> (fs::File, Vec<TempFileChunk>, HashMap<Tri, Count>) {
+fn convert_pack_to_just_trigrams<R: Read + Seek>(mut pack: R) -> (fs::File, Vec<TempFileChunk>, HashMap<Tri, Count>) {
     let mut pos = 16;
     pack.seek(SeekFrom::Start(pos)).unwrap();
 
@@ -76,85 +76,113 @@ fn read_pack<R: Read + Seek>(mut pack: R) -> (fs::File, Vec<TempFileChunk>, Hash
     (temp, temp_index, trigram_count)
 }
 
+/// Take the lowest trigrams out of the iterator, and prepare space to gather Poses for them.
+/// Stops at an arbitrary memory limit.
+fn take_some<I>(trigram_count: &mut I) -> HashMap<Tri, Vec<Pos>>
+    where
+        I: Iterator<Item=(Tri, Count)>
+{
+    let mut block = 0usize;
+    let mut tris: HashMap<Tri, Vec<Pos>> = HashMap::new();
+    loop {
+        let (tri, count) = match trigram_count.next() {
+            Some(t) => (t.0, t.1),
+            None => break,
+        };
+
+        tris.insert(tri, Vec::with_capacity(count as usize));
+
+        // ~ 400MB ram usage?
+        if block > 100_000_000 {
+            break;
+        }
+        block += count as usize;
+    }
+
+    tris
+}
+
+fn fill_tris(temp_index: &[TempFileChunk], temp_data: &[Tri], tris: &mut HashMap<Tri, Vec<Pos>>) {
+    // inclusive
+    let min = *tris.keys().min().unwrap();
+    let max = *tris.keys().max().unwrap();
+
+    let mut run = 0usize;
+
+    // For every document...
+    for part in temp_index {
+
+        // Work out what part of its trigrams we even need to look at...
+        let subslice = &temp_data[run..(run + (part.num_tris as usize))];
+        let mut start = match subslice.binary_search(&min) {
+            Ok(idx) | Err(idx) => idx,
+        };
+
+        if start > 1 {
+            start -= 2;
+        }
+
+        let end = start + match subslice[start..].binary_search(&max) {
+            Ok(idx) | Err(idx) => idx,
+        } + 1;
+
+        let end = if end > subslice.len() {
+            subslice.len()
+        } else {
+            end
+        };
+
+        // Then, for each of those, save the document ids in the appropriate place.
+        for tri in &subslice[start..end] {
+            if let Some(v) = tris.get_mut(tri) {
+                v.push(part.pos);
+            }
+        }
+
+        run += part.num_tris as usize;
+    }
+
+    assert_eq!(temp_data.len(), run);
+}
+
+
 fn main() {
     let args: Vec<String> = env::args().collect();
 
     let fp = io::BufReader::new(fs::File::open(&args[1]).unwrap());
     let mut out = io::BufWriter::new(fs::File::create(&args[2]).unwrap());
 
-    let (temp, temp_index, trigram_count) = read_pack(fp);
+    // First, we transform the pack into just the trigrams for each item in the pack,
+    // remembering where those trigrams referred to, stored in a `temp`orary file.
+    let (temp, temp_index, trigram_count) = convert_pack_to_just_trigrams(fp);
 
+    // ..which we immediately map into memory as an array of Tri(u32)s.
     let map = memmap::Mmap::open(&temp, memmap::Protection::Read).unwrap();
+    let temp_data = unsafe { std::slice::from_raw_parts((map.ptr()) as *const Tri, map.len() / 4) };
 
-    let whole = unsafe { std::slice::from_raw_parts((map.ptr()) as *const u32, map.len() / 4) };
-
-    println!("{} seen", trigram_count.len());
-
-    let mut trigram_count: Vec<(u32, u32)> = trigram_count.into_iter().map(|x| (x.0, x.1)).collect();
-
+    // Sort the trigrams we've seen by number.
+    let mut trigram_count: Vec<(Tri, Count)> = trigram_count.into_iter().map(|x| (x.0, x.1)).collect();
     trigram_count.sort();
+    let mut trigram_count = trigram_count.into_iter();
 
-    let mut seen = trigram_count.iter();
 
+    // Now, we want to transpose [{A, B, C}, {A, C, E}] into [A: {1, 2}, B: {1}, C: {1, 2}, E: {2}]
+
+
+    // Let's do this in blocks, so we don't run out of memory.
     loop {
-        let mut block = 0usize;
-        let mut tris: HashMap<u32, Vec<u32>> = HashMap::new();
-        loop {
-            let (tri, count) = match seen.next() {
-                Some(t) => (t.0, t.1),
-                None => break,
-            };
 
-            tris.insert(tri, Vec::with_capacity(count as usize));
-
-            // ~ 400MB ram usage?
-            if block > 100_000_000 {
-                break;
-            }
-            block += count as usize;
-        }
+        // Select a block of trigrams to process, and allocate space for their documents.
+        let mut tris = take_some(&mut trigram_count);
 
         if tris.is_empty() {
             break;
         }
 
-        // inclusive
-        let min = *tris.keys().min().unwrap();
-        let max = *tris.keys().max().unwrap();
+        // Fetch the document ids for each of the selected trigrams, by scanning the temp data.
+        fill_tris(&temp_index, &temp_data, &mut tris);
 
-        let mut run = 0usize;
-
-        for part in &temp_index {
-            let subslice = &whole[run..(run + (part.num_tris as usize))];
-            let mut start = match subslice.binary_search(&min) {
-                Ok(idx) | Err(idx) => idx,
-            };
-
-            if start > 1 {
-                start -= 2;
-            }
-
-            let end = start + match subslice[start..].binary_search(&max) {
-                Ok(idx) | Err(idx) => idx,
-            } + 1;
-
-            let end = if end > subslice.len() {
-                subslice.len()
-            } else {
-                end
-            };
-
-            for tri in &subslice[start..end] {
-                if let Some(v) = tris.get_mut(tri) {
-                    v.push(part.pos);
-                }
-            }
-
-            run += part.num_tris as usize;
-        }
-
-        assert_eq!(map.len(), run * 4);
-
+        // Write them out.
         for (tri, poses) in &tris {
             assert_eq!(tris[tri].len(), poses.len(), "{}", tri);
             out.write_u32::<LittleEndian>(*tri).unwrap();
