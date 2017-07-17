@@ -20,6 +20,7 @@ use tri;
 
 const MAX_TRI: u32 = 64 * 64 * 64;
 
+#[derive(Debug)]
 struct IndexFile<'f> {
     addendum: u64,
     map: memmap::Mmap,

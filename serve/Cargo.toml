@@ -18,6 +18,8 @@ lz4 = "1.21.0"
 log = "0.3.8"
 stderrlog = "0.2.2"
 
+url = "1.5.1"
+
 postgres = "0.14.1"
 r2d2 = "0.7.2"
 r2d2_postgres = "0.12.0"

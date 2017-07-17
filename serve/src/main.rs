@@ -8,6 +8,7 @@ extern crate router;
 #[macro_use]
 extern crate serde_json;
 extern crate stderrlog;
+extern crate url;
 extern crate persistent;
 extern crate postgres;
 extern crate r2d2;
@@ -236,11 +237,16 @@ fn tri_num(req: &mut Request) -> IronResult<Response> {
 }
 
 fn search(req: &mut Request) -> IronResult<Response> {
-    let term = req.extensions
+    let term: String = req.extensions
         .get::<Router>()
         .unwrap()
         .find("term")
         .unwrap()
+        .to_string();
+
+    let term = url::percent_encoding::percent_decode(term.as_bytes())
+        .decode_utf8()
+        .expect("query")
         .to_string();
 
     let index = req.get::<Read<AppIndex>>().expect("persistent");
