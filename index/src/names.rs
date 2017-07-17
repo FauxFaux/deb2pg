@@ -61,8 +61,10 @@ pub fn addendum_from_path(path: &str) -> u64 {
     assert_eq!('.', it.next().unwrap());
 
     // TODO: NO JUST NO WHY
-    it.take("0000000000000000000000".len()).collect::<String>().parse::<u64>().expect("second num")
-        * 1024 * 1024 * 1024 + size_raw + if text { 8 } else { 0 }
+    it.take("0000000000000000000000".len())
+        .collect::<String>()
+        .parse::<u64>()
+        .expect("second num") * 1024 * 1024 * 1024 + size_raw + if text { 8 } else { 0 }
 }
 
 #[cfg(test)]
@@ -94,33 +96,81 @@ mod tests {
 
     #[test]
     fn filename() {
-        assert_eq!(("bin-2.0000000000000000000000".to_string(), 16), filename_for(16));
-        assert_eq!(("bin-3.0000000000000000000000".to_string(), 16), filename_for(17));
-        assert_eq!(("bin-8.0000000000000000000000".to_string(), 16), filename_for(22));
-        assert_eq!(("bin-9.0000000000000000000000".to_string(), 16), filename_for(23));
+        assert_eq!(
+            ("bin-2.0000000000000000000000".to_string(), 16),
+            filename_for(16)
+        );
+        assert_eq!(
+            ("bin-3.0000000000000000000000".to_string(), 16),
+            filename_for(17)
+        );
+        assert_eq!(
+            ("bin-8.0000000000000000000000".to_string(), 16),
+            filename_for(22)
+        );
+        assert_eq!(
+            ("bin-9.0000000000000000000000".to_string(), 16),
+            filename_for(23)
+        );
 
-        assert_eq!(("text-2.0000000000000000000000".to_string(), 16), filename_for(24));
-        assert_eq!(("text-3.0000000000000000000000".to_string(), 16), filename_for(25));
+        assert_eq!(
+            ("text-2.0000000000000000000000".to_string(), 16),
+            filename_for(24)
+        );
+        assert_eq!(
+            ("text-3.0000000000000000000000".to_string(), 16),
+            filename_for(25)
+        );
 
-        assert_eq!(("text-8.0000000000000000000000".to_string(), 16), filename_for(30));
-        assert_eq!(("text-9.0000000000000000000000".to_string(), 16), filename_for(31));
+        assert_eq!(
+            ("text-8.0000000000000000000000".to_string(), 16),
+            filename_for(30)
+        );
+        assert_eq!(
+            ("text-9.0000000000000000000000".to_string(), 16),
+            filename_for(31)
+        );
 
-        assert_eq!(("bin-2.0000000000000000000000".to_string(), 32), filename_for(32));
-        assert_eq!(("text-9.0000000000000000000000".to_string(), 32), filename_for(32 + 15));
+        assert_eq!(
+            ("bin-2.0000000000000000000000".to_string(), 32),
+            filename_for(32)
+        );
+        assert_eq!(
+            ("text-9.0000000000000000000000".to_string(), 32),
+            filename_for(32 + 15)
+        );
 
-        assert_eq!(("bin-2.0000000000000000000001".to_string(), 16), filename_for(1024 * 1024 * 1024 + 16));
-        assert_eq!(("text-9.0000000000000000000001".to_string(), 16), filename_for(1024 * 1024 * 1024 + 16 + 15));
+        assert_eq!(
+            ("bin-2.0000000000000000000001".to_string(), 16),
+            filename_for(1024 * 1024 * 1024 + 16)
+        );
+        assert_eq!(
+            ("text-9.0000000000000000000001".to_string(), 16),
+            filename_for(1024 * 1024 * 1024 + 16 + 15)
+        );
 
-        assert_eq!(("bin-2.0000000000000000000017".to_string(), 16), filename_for(17 * 1024 * 1024 * 1024 + 16));
+        assert_eq!(
+            ("bin-2.0000000000000000000017".to_string(), 16),
+            filename_for(17 * 1024 * 1024 * 1024 + 16)
+        );
     }
 
     #[test]
     fn from_path() {
         assert_eq!(0, addendum_from_path("bin-2.0000000000000000000000"));
         assert_eq!(8, addendum_from_path("text-2.0000000000000000000000"));
-        assert_eq!(17 * 1024 * 1024 * 1024, addendum_from_path("bin-2.0000000000000000000017"));
-        assert_eq!(17 * 1024 * 1024 * 1024 + 8, addendum_from_path("text-2.0000000000000000000017"));
+        assert_eq!(
+            17 * 1024 * 1024 * 1024,
+            addendum_from_path("bin-2.0000000000000000000017")
+        );
+        assert_eq!(
+            17 * 1024 * 1024 * 1024 + 8,
+            addendum_from_path("text-2.0000000000000000000017")
+        );
 
-        assert_eq!(17 * 1024 * 1024 * 1024 + 9, addendum_from_path("text-3.0000000000000000000017"));
+        assert_eq!(
+            17 * 1024 * 1024 * 1024 + 9,
+            addendum_from_path("text-3.0000000000000000000017")
+        );
     }
 }

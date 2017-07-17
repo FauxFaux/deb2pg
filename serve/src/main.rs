@@ -129,17 +129,18 @@ fn cat(req: &mut Request) -> IronResult<Response> {
             fd.seek(SeekFrom::Start(off as u64)).unwrap();
             let mut data = Vec::new();
             if let Some(mut record) = catfight::read_record(&mut fd).unwrap() {
-                lz4::Decoder::new(&mut record.reader).expect("lz4").read_to_end(&mut data).expect("read");
+                lz4::Decoder::new(&mut record.reader)
+                    .expect("lz4")
+                    .read_to_end(&mut data)
+                    .expect("read");
                 record.complete().expect("complete");
             } else {
                 panic!()
             }
-            Ok(Response::with((
-                status::Ok,
-                ContentType::plaintext().0,
-                data,
-            )))
-        },
+            Ok(Response::with(
+                (status::Ok, ContentType::plaintext().0, data),
+            ))
+        }
         _ => unimplemented!(),
     }
 

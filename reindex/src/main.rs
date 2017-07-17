@@ -32,21 +32,28 @@ struct TempFileChunk {
 /// then for the second, ...
 /// The returned `temp_index` of chunks stores their length, and which chunk-relative 'pos' they refer to
 /// The `trigram_count` for every trigram is also recorded.
-fn convert_pack_to_just_trigrams<R: Read + Seek>(mut pack: R) -> (fs::File, Vec<TempFileChunk>, HashMap<Tri, Count>) {
+fn convert_pack_to_just_trigrams<R: Read + Seek>(
+    mut pack: R,
+) -> (fs::File, Vec<TempFileChunk>, HashMap<Tri, Count>) {
     let mut pos = 16;
     pack.seek(SeekFrom::Start(pos)).unwrap();
 
     let mut temp = io::BufWriter::new(tempfile::tempfile().unwrap());
     let mut temp_index = Vec::with_capacity(200_000);
-    let mut trigram_count: HashMap<Tri, u32> = HashMap::with_capacity(64*64*64);
+    let mut trigram_count: HashMap<Tri, u32> = HashMap::with_capacity(64 * 64 * 64);
 
     loop {
         if let Some(mut entry) = catfight::read_record(&mut pack).unwrap() {
             // len is the compressed length, but better than zero
             let mut buf = Vec::with_capacity(entry.len as usize);
-            lz4::Decoder::new(&mut entry.reader).unwrap().read_to_end(&mut buf).unwrap();
+            lz4::Decoder::new(&mut entry.reader)
+                .unwrap()
+                .read_to_end(&mut buf)
+                .unwrap();
 
-            let mut tris: Vec<u32> = index::trigrams_full(&String::from_utf8_lossy(&buf)).into_iter().collect();
+            let mut tris: Vec<u32> = index::trigrams_full(&String::from_utf8_lossy(&buf))
+                .into_iter()
+                .collect();
             temp_index.push(TempFileChunk {
                 pos: pos as u32,
                 num_tris: tris.len() as u32,
@@ -79,8 +86,8 @@ fn convert_pack_to_just_trigrams<R: Read + Seek>(mut pack: R) -> (fs::File, Vec<
 /// Take the lowest trigrams out of the iterator, and prepare space to gather Poses for them.
 /// Stops at an arbitrary memory limit.
 fn take_some<I>(trigram_count: &mut I) -> HashMap<Tri, Vec<Pos>>
-    where
-        I: Iterator<Item=(Tri, Count)>
+where
+    I: Iterator<Item = (Tri, Count)>,
 {
     let mut block = 0usize;
     let mut tris: HashMap<Tri, Vec<Pos>> = HashMap::with_capacity(128);
@@ -123,9 +130,10 @@ fn fill_tris(temp_index: &[TempFileChunk], temp_data: &[Tri], tris: &mut HashMap
             start -= 2;
         }
 
-        let end = start + match subslice[start..].binary_search(&max) {
-            Ok(idx) | Err(idx) => idx,
-        } + 1;
+        let end = start +
+            match subslice[start..].binary_search(&max) {
+                Ok(idx) | Err(idx) => idx,
+            } + 1;
 
         let end = if end > subslice.len() {
             subslice.len()
@@ -159,7 +167,8 @@ fn main() {
 
 
     // Sort the trigrams we've seen by number.
-    let mut trigram_count: Vec<(Tri, Count)> = trigram_count.into_iter().map(|x| (x.0, x.1)).collect();
+    let mut trigram_count: Vec<(Tri, Count)> =
+        trigram_count.into_iter().map(|x| (x.0, x.1)).collect();
     trigram_count.sort();
     let mut trigram_count = trigram_count.into_iter();
 
@@ -200,7 +209,8 @@ fn main() {
         out.write_u32::<LittleEndian>(0xD81F).unwrap();
         out.write_u32::<LittleEndian>(0).unwrap();
         out.write_u32::<LittleEndian>(0).unwrap();
-        out.write_u32::<LittleEndian>(tri_poses.len() as u32).unwrap();
+        out.write_u32::<LittleEndian>(tri_poses.len() as u32)
+            .unwrap();
 
         for tri in &tris {
             out.write_u32::<LittleEndian>(*tri).unwrap();

@@ -12,7 +12,9 @@ use io::SeekFrom;
 use byteorder::{LittleEndian, ReadBytesExt};
 
 fn read<R>(mut fp: R) -> io::Result<()>
-where R: Seek + Read {
+where
+    R: Seek + Read,
+{
     let tri = fp.read_u32::<LittleEndian>()?;
     let len = fp.read_u32::<LittleEndian>()? as usize;
     fp.seek(SeekFrom::Current(len as i64 * 4))?;

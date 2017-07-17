@@ -105,15 +105,15 @@ impl<'i> Index<'i> {
                 by_tri,
             });
         }
-        Ok(Index {
-            files,
-        })
+        Ok(Index { files })
     }
 
     pub fn documents_for_tri(&self, tri: u32) -> Vec<u64> {
         let mut all = Vec::new();
         for file in &self.files {
-            all.extend(file.by_tri[tri as usize].iter().map(|x| *x as u64 + file.addendum));
+            all.extend(file.by_tri[tri as usize].iter().map(|x| {
+                *x as u64 + file.addendum
+            }));
         }
         all
     }
@@ -130,7 +130,8 @@ impl<'i> Index<'i> {
 
             // TODO: obviously this is dumb; they're pre-sorted
             while let Some(next) = it.next() {
-                let next_set: HashSet<u32> = file.by_tri[*next as usize].iter().map(|x| *x).collect();
+                let next_set: HashSet<u32> =
+                    file.by_tri[*next as usize].iter().map(|x| *x).collect();
                 this_file.retain(|x| next_set.contains(x));
                 if this_file.is_empty() {
                     break;
@@ -144,12 +145,17 @@ impl<'i> Index<'i> {
             let mut pack = fs::File::open(&file.pack).expect("pack shouldn't be deleted ever");
             for local in this_file {
                 pack.seek(SeekFrom::Start(local as u64)).expect("seek");
-                let mut entry = catfight::read_record(&mut pack).expect("read entry").expect("entry present");
+                let mut entry = catfight::read_record(&mut pack)
+                    .expect("read entry")
+                    .expect("entry present");
                 // TODO: This is quite dumb: could do early termination.
 
                 // len is the compressed length, but better than zero
                 let mut buf = Vec::with_capacity(entry.len as usize);
-                lz4::Decoder::new(&mut entry.reader).unwrap().read_to_end(&mut buf).unwrap();
+                lz4::Decoder::new(&mut entry.reader)
+                    .unwrap()
+                    .read_to_end(&mut buf)
+                    .unwrap();
                 if twoway::find_bytes(buf.as_slice(), search.as_bytes()).is_some() {
                     matched.push(local as u64 + file.addendum);
                 }
