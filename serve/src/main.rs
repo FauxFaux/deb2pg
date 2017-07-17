@@ -289,7 +289,7 @@ fn main() {
         }
 
         println!("{} paths found; going to open index...", paths.len());
-        index::find::Index::open(&paths).unwrap()
+        index::find::Index::open(paths).unwrap()
     };
 
     println!("index loaded");

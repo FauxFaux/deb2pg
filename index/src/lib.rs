@@ -1,11 +1,13 @@
 extern crate bit_set;
 extern crate byteorder;
+extern crate catfight;
 #[macro_use]
 extern crate error_chain;
 extern crate libc;
 extern crate lz4;
 extern crate memmap;
 extern crate regex_syntax;
+extern crate twoway;
 
 pub mod find;
 pub mod names;

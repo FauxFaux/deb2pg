@@ -1,11 +1,19 @@
 use std;
 
+use std::fs;
 use std::io;
 use std::path;
 use std::slice;
 
 use std::collections::HashSet;
+use std::io::Read;
+use std::io::Seek;
+use std::io::SeekFrom;
 
+use lz4;
+use twoway;
+
+use catfight;
 use memmap;
 use names;
 use tri;
@@ -18,6 +26,7 @@ struct IndexFile<'f> {
 
     // this vec is really a box of an array[MAX_TRI], but "Stack Clash".
     by_tri: Vec<&'f [u32]>,
+    pack: path::PathBuf,
 }
 
 pub struct Index<'i> {
@@ -25,9 +34,17 @@ pub struct Index<'i> {
 }
 
 impl<'i> Index<'i> {
-    pub fn open(paths: &[path::PathBuf]) -> io::Result<Self> {
+    pub fn open(mut paths: Vec<path::PathBuf>) -> io::Result<Self> {
+        paths.sort();
         let mut files = Vec::with_capacity(paths.len());
         for path in paths {
+            let pack = {
+                let mut tmp = path.clone();
+                tmp.set_file_name(path.file_stem().expect("stem"));
+                tmp
+            };
+
+
             let addendum = names::addendum_from_path(path.file_name().unwrap().to_str().unwrap());
             let map = memmap::Mmap::open_path(path, memmap::Protection::Read)?;
 
@@ -82,6 +99,7 @@ impl<'i> Index<'i> {
             }
 
             files.push(IndexFile {
+                pack,
                 addendum,
                 map,
                 by_tri,
@@ -119,8 +137,22 @@ impl<'i> Index<'i> {
                 }
             }
 
+            if this_file.is_empty() {
+                continue;
+            }
+
+            let mut pack = fs::File::open(&file.pack).expect("pack shouldn't be deleted ever");
             for local in this_file {
-                matched.push(local as u64 + file.addendum);
+                pack.seek(SeekFrom::Start(local as u64)).expect("seek");
+                let mut entry = catfight::read_record(&mut pack).expect("read entry").expect("entry present");
+                // TODO: This is quite dumb: could do early termination.
+
+                // len is the compressed length, but better than zero
+                let mut buf = Vec::with_capacity(entry.len as usize);
+                lz4::Decoder::new(&mut entry.reader).unwrap().read_to_end(&mut buf).unwrap();
+                if twoway::find_bytes(buf.as_slice(), search.as_bytes()).is_some() {
+                    matched.push(local as u64 + file.addendum);
+                }
             }
 
         }
