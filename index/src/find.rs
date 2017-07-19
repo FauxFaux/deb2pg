@@ -2,6 +2,7 @@ use std;
 
 use std::fs;
 use std::io;
+use std::iter;
 use std::path;
 use std::slice;
 
@@ -26,7 +27,7 @@ struct IndexFile<'f> {
     addendum: u64,
     map: memmap::Mmap,
 
-    // this vec is really a box of an array[MAX_TRI], but "Stack Clash".
+    /// by_tri.len() === MAX_TRI. The contained slices are zero-or-more local document ids.
     by_tri: Vec<&'f [u32]>,
     pack: path::PathBuf,
 }
@@ -124,25 +125,10 @@ impl<'i> Index<'i> {
         let mut matched = Vec::new();
         let target = tri::trigrams_full(search);
         for file in &self.files {
-            let mut it = target.iter();
-            let mut this_file: HashSet<u32> = match it.next() {
-                Some(first) => file.by_tri[*first as usize].iter().map(|x| *x).collect(),
-                None => continue,
-            };
-
-            // TODO: obviously this is dumb; they're pre-sorted
-            while let Some(next) = it.next() {
-                let next_set: HashSet<u32> =
-                    file.by_tri[*next as usize].iter().map(|x| *x).collect();
-                this_file.retain(|x| next_set.contains(x));
-                if this_file.is_empty() {
-                    break;
-                }
-            }
-
-            if this_file.is_empty() {
-                continue;
-            }
+            let this_file = find_intersection(target
+                .iter()
+                .map(|tri| file.by_tri[*tri as usize].iter().peekable())
+                .collect());
 
             let mut pack = fs::File::open(&file.pack).expect("pack shouldn't be deleted ever");
             for local in this_file {
@@ -163,5 +149,72 @@ impl<'i> Index<'i> {
 
         }
         matched
+    }
+}
+
+fn find_intersection(mut slices: Vec<iter::Peekable<slice::Iter<u32>>>) -> Vec<u32> {
+    slices.sort_unstable_by_key(|iter| iter.size_hint().0);
+
+    let mut intersection: Vec<u32> = Vec::new();
+
+    loop {
+        // find the largest value at the head of a list; the next possible viable document
+        let mut max = std::u32::MIN;
+        for slice in &mut slices {
+            match slice.peek() {
+                Some(val) => if **val > max {
+                    max = **val;
+                },
+                None => return intersection,
+            }
+        }
+
+        // move everything up to this value, remembering whether a move was necessary
+        let mut advanced = false;
+        for slice in &mut slices {
+            loop {
+                let next = **match slice.peek() {
+                    Some(new) => new,
+                    None => return intersection,
+                };
+                if next >= max {
+                    break;
+                }
+
+                advanced = true;
+                slice.next();
+            }
+        }
+
+        // if we didn't move anything up to the max, then we found a value
+        if !advanced {
+            intersection.push(max);
+            for slice in &mut slices {
+                if slice.next().is_none() {
+                    return intersection;
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::find_intersection;
+
+    #[test]
+    fn intersection() {
+        let d1 = [1, 2, 3, 4, 6];
+        let d2 = [2, 3, 4, 6];
+        let d3 = [1, 2, 3, 4, 5];
+        assert_eq!(vec![
+            2, 3, 4
+        ],
+            find_intersection(vec![
+                d1.iter().peekable(),
+                d2.iter().peekable(),
+                d3.iter().peekable(),
+            ])
+        );
     }
 }
