@@ -25,6 +25,8 @@ CREATE TABLE file (
   paths     BIGINT [] NOT NULL
 );
 
+CREATE INDEX file_pos ON file (pos);
+
 CREATE TABLE container (
   id       BIGSERIAL PRIMARY KEY,
   ingested TIMESTAMPTZ NOT NULL DEFAULT now(),
