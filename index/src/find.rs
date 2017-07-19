@@ -14,6 +14,7 @@ use lz4;
 use twoway;
 
 use catfight;
+use grep;
 use memmap;
 use names;
 use tri;
@@ -149,15 +150,13 @@ impl<'i> Index<'i> {
                 let mut entry = catfight::read_record(&mut pack)
                     .expect("read entry")
                     .expect("entry present");
-                // TODO: This is quite dumb: could do early termination.
 
-                // len is the compressed length, but better than zero
-                let mut buf = Vec::with_capacity(entry.len as usize);
-                lz4::Decoder::new(&mut entry.reader)
-                    .unwrap()
-                    .read_to_end(&mut buf)
-                    .unwrap();
-                if twoway::find_bytes(buf.as_slice(), search.as_bytes()).is_some() {
+                if grep::reader_contains(
+                    search.as_bytes(),
+                    lz4::Decoder::new(&mut entry.reader).unwrap(),
+                ).unwrap()
+                    .is_some()
+                {
                     matched.push(local as u64 + file.addendum);
                 }
             }

@@ -10,6 +10,7 @@ extern crate regex_syntax;
 extern crate twoway;
 
 pub mod find;
+mod grep;
 pub mod names;
 mod search;
 mod tri;
