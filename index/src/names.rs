@@ -44,7 +44,7 @@ pub fn filename_for(pos: u64) -> (String, u32) {
 }
 
 // TODO: this is awful
-pub fn addendum_from_path(path: &str) -> u64 {
+pub fn addendum_from_path(path: &str) -> (u8, u64) {
     // text-5.0000000000000000000000.idx
     let text = if path.starts_with("text-") {
         true
@@ -57,14 +57,15 @@ pub fn addendum_from_path(path: &str) -> u64 {
     let mut it = path.chars().skip(if text { 5 } else { 4 });
     let size_raw = it.next().expect("num") as u8 - '2' as u8;
     assert!(size_raw >= 2 - 2 && size_raw <= 9 - 2);
-    let size_raw = size_raw as u64;
     assert_eq!('.', it.next().unwrap());
 
-    // TODO: NO JUST NO WHY
-    it.take("0000000000000000000000".len())
-        .collect::<String>()
-        .parse::<u64>()
-        .expect("second num") * 1024 * 1024 * 1024 + size_raw + if text { 8 } else { 0 }
+    (size_raw + 2,
+        // TODO: NO JUST NO WHY
+        it.take("0000000000000000000000".len())
+            .collect::<String>()
+            .parse::<u64>()
+            .expect("second num") * 1024 * 1024 * 1024 + (size_raw as u64) + if text { 8 } else { 0 }
+    )
 }
 
 #[cfg(test)]
@@ -157,19 +158,19 @@ mod tests {
 
     #[test]
     fn from_path() {
-        assert_eq!(0, addendum_from_path("bin-2.0000000000000000000000"));
-        assert_eq!(8, addendum_from_path("text-2.0000000000000000000000"));
+        assert_eq!((2, 0), addendum_from_path("bin-2.0000000000000000000000"));
+        assert_eq!((2, 8), addendum_from_path("text-2.0000000000000000000000"));
         assert_eq!(
-            17 * 1024 * 1024 * 1024,
+            (2, 17 * 1024 * 1024 * 1024),
             addendum_from_path("bin-2.0000000000000000000017")
         );
         assert_eq!(
-            17 * 1024 * 1024 * 1024 + 8,
+            (2, 17 * 1024 * 1024 * 1024 + 8),
             addendum_from_path("text-2.0000000000000000000017")
         );
 
         assert_eq!(
-            17 * 1024 * 1024 * 1024 + 9,
+            (3, 17 * 1024 * 1024 * 1024 + 9),
             addendum_from_path("text-3.0000000000000000000017")
         );
     }

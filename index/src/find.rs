@@ -53,7 +53,12 @@ impl<'i> Index<'i> {
             };
 
 
-            let addendum = names::addendum_from_path(path.file_name().unwrap().to_str().unwrap());
+            let (size_hint, addendum) = names::addendum_from_path(path.file_name().unwrap().to_str().unwrap());
+//            if size_hint > 4 {
+//                println!("limited size index: excluding files in {:?}", path);
+//                continue;
+//            }
+
             let map = memmap::Mmap::open_path(path, memmap::Protection::Read)?;
 
             assert_eq!(0, map.len() % std::mem::size_of::<u32>());

@@ -291,9 +291,11 @@ fn main() {
         let mut paths = Vec::new();
         for file in fs::read_dir("/mnt/data/t").unwrap() {
             let path = file.unwrap().path();
-            if path.extension().unwrap().to_str().unwrap() == "idx" {
-                paths.push(path);
+            if path.extension().unwrap().to_str().unwrap() != "idx" {
+                continue;
             }
+
+            paths.push(path);
         }
 
         println!("{} paths found; going to open index...", paths.len());
