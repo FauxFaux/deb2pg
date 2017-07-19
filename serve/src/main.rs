@@ -250,12 +250,13 @@ fn search(req: &mut Request) -> IronResult<Response> {
         .to_string();
 
     let index = req.get::<Read<AppIndex>>().expect("persistent");
-    let docs = index.documents_for_search(&term);
+    let search = index.documents_for_search(&term);
     Ok(Response::with((
         status::Ok,
         ContentType::json().0,
         json!({
-            "docs": docs,
+            "docs": search.docs,
+            "grepped": search.grepped,
         }).to_string(),
     )))
 }

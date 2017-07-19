@@ -36,6 +36,11 @@ pub struct Index<'i> {
     files: Vec<IndexFile<'i>>,
 }
 
+pub struct SearchResult {
+    pub docs: Vec<u64>,
+    pub grepped: u64,
+}
+
 impl<'i> Index<'i> {
     pub fn open(mut paths: Vec<path::PathBuf>) -> io::Result<Self> {
         paths.sort();
@@ -121,8 +126,9 @@ impl<'i> Index<'i> {
         all
     }
 
-    pub fn documents_for_search(&self, search: &str) -> Vec<u64> {
+    pub fn documents_for_search(&self, search: &str) -> SearchResult {
         let mut matched = Vec::new();
+        let mut grepped = 0u64;
         let target = tri::trigrams_full(search);
         for file in &self.files {
             let this_file = find_intersection(target
@@ -145,10 +151,14 @@ impl<'i> Index<'i> {
                 {
                     matched.push(local as u64 + file.addendum);
                 }
+                grepped += 1;
             }
 
         }
-        matched
+        SearchResult {
+            docs: matched,
+            grepped,
+        }
     }
 }
 
