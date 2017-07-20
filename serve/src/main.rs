@@ -322,5 +322,5 @@ fn main() {
     chain.link(Read::<AppIndex>::both(index));
     chain.link_after(logger_after);
 
-    Iron::new(chain).http("localhost:6918").unwrap();
+    Iron::new(chain).http("127.0.01:6918").unwrap();
 }
