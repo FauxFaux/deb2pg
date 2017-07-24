@@ -87,7 +87,7 @@ pub fn read_record<R: io::Read>(fd: &mut R) -> Result<Option<Record<R>>> {
     }))
 }
 
-fn flock(what: &File) -> Result<()> {
+pub fn flock(what: &File) -> Result<()> {
     let ret = unsafe { libc::flock(what.as_raw_fd(), libc::LOCK_EX) };
     if 0 != ret {
         Err(Error::with_chain(io::Error::last_os_error(), "flocking"))
@@ -96,7 +96,7 @@ fn flock(what: &File) -> Result<()> {
     }
 }
 
-fn unlock_flock(what: &File) -> Result<()> {
+pub fn unlock_flock(what: &File) -> Result<()> {
     let ret = unsafe { libc::flock(what.as_raw_fd(), libc::LOCK_UN) };
     if 0 != ret {
         Err(Error::with_chain(io::Error::last_os_error(), "un-flocking"))
@@ -126,30 +126,7 @@ pub fn store(blocksize: u64, src: &mut File, dest_root: &str, extra: &[u8]) -> R
             continue;
         }
 
-        ensure!(
-            0 == file_end % 16,
-            ErrorKind::InvalidState(format!("unaligned file: {}", file_end))
-        );
-
-        if 0 == file_end {
-            // we locked a new file, write a header
-            fd.write_all(b"cf2\0\0\0\0\0")?;
-            fd.write_u64::<LittleEndian>(target_num).unwrap();
-            file_end = 16;
-        }
-
-        let extra_len: u64 = extra.len() as u64;
-        let record_end = 8 + 8 + src_len + extra_len;
-        fd.write_u64::<LittleEndian>(record_end)?;
-        fd.write_u64::<LittleEndian>(extra_len)?;
-        fd.write_all(extra)?;
-        fd.flush()?;
-
-        fd.set_len(file_end + align(record_end))?;
-
-        unlock_flock(&fd)?;
-
-        copy_file(src, &mut fd, src_len)?;
+        writey_write(&mut fd, &mut file_end, src, src_len, extra)?;
 
         return Ok(target_num * blocksize + file_end);
     }
@@ -157,6 +134,33 @@ pub fn store(blocksize: u64, src: &mut File, dest_root: &str, extra: &[u8]) -> R
     Err(
         ErrorKind::InvalidState("ran out of files".to_string()).into(),
     )
+}
+
+pub fn writey_write(mut fd: &mut File, file_end: &mut u64, src: &mut File, src_len: u64, extra: &[u8]) -> Result<()> {
+    ensure!(
+            0 == *file_end % 16,
+            ErrorKind::InvalidState(format!("unaligned file: {}", file_end))
+        );
+
+    if 0 == *file_end {
+        // we locked a new file, write a header
+        fd.write_all(b"cf2\0\0\0\0\0\0\0\0\0\0\0\0\0")?;
+        *file_end = 16;
+    }
+
+    let extra_len: u64 = extra.len() as u64;
+    let record_end = 8 + 8 + src_len + extra_len;
+    fd.write_u64::<LittleEndian>(record_end)?;
+    fd.write_u64::<LittleEndian>(extra_len)?;
+    fd.write_all(extra)?;
+    fd.flush()?;
+
+    fd.set_len(*file_end + align(record_end))?;
+
+    unlock_flock(&fd)?;
+
+    copy_file(src, fd, src_len)?;
+    Ok(())
 }
 
 #[cfg(never)]

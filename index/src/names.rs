@@ -16,12 +16,20 @@ fn text_otherwise_bin(text: bool) -> &'static str {
     if text { "text" } else { "bin" }
 }
 
+pub fn magic_offset_only(len: u64, text: bool) -> u8 {
+    make_shard_magic(len) - MIN_SHARD_NO + if text { SHARD_NO_TEXT_OFFSET } else { 0 }
+}
+
+pub fn name_for_magic(mut magic: u8) -> String {
+    assert!(magic < 16);
+    format!("{}-{}", text_otherwise_bin(magic >= SHARD_NO_TEXT_OFFSET), magic % SHARD_NO_TEXT_OFFSET + MIN_SHARD_NO)
+}
+
 /// Returns the base filename, and the magic value (0-15) added to a position.
 pub fn magic_offset(len: u64, text: bool) -> (String, u8) {
     let shard_magic = make_shard_magic(len);
-    let shard_name = format!("{}-{}", text_otherwise_bin(text), shard_magic);
     let shard_id = shard_magic - MIN_SHARD_NO + if text { SHARD_NO_TEXT_OFFSET } else { 0 };
-    (shard_name, shard_id)
+    (name_for_magic(shard_id), shard_id)
 }
 
 pub fn filename_for(pos: u64) -> (String, u32) {

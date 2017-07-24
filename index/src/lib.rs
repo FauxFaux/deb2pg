@@ -13,6 +13,7 @@ pub mod find;
 mod grep;
 pub mod names;
 mod search;
+mod shards;
 mod tri;
 
 pub use tri::trigrams_full;
@@ -23,6 +24,9 @@ mod tests;
 
 mod errors {
     error_chain! {
+        links {
+            Catfight(::catfight::Error, ::catfight::ErrorKind);
+        }
         foreign_links {
             Io(::std::io::Error);
         }

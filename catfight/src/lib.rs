@@ -9,6 +9,9 @@ mod copy;
 
 pub use catfight::read_record;
 pub use catfight::store;
+pub use catfight::flock;
+pub use catfight::unlock_flock;
+pub use catfight::writey_write;
 
 pub use errors::{Error, ErrorKind, Result};
 
