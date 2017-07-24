@@ -21,24 +21,6 @@ pub fn align(val: u64) -> u64 {
     (val + 15) / 16 * 16
 }
 
-fn unarchive(root: &str, block_size: u64, offset: u64) -> Result<()> {
-    let target_file_id: u64 = offset / block_size;
-    let target_file_offset = offset % block_size;
-
-    let target_path = format!("{}.{:022}", root, target_file_id);
-    let mut fd = File::open(target_path)?;
-
-    fd.seek(io::SeekFrom::Start(target_file_offset))?;
-    if let Some(mut record) = read_record(&mut fd)? {
-        io::copy(&mut record.reader, &mut io::stdout())?;
-        record.complete()
-    } else {
-        bail!(ErrorKind::InvalidState(
-            "read appears to be past the end of the file".to_string(),
-        ))
-    }
-}
-
 pub struct Record<'a, R: 'a>
 where
     R: io::Read,
