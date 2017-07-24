@@ -1,7 +1,7 @@
 ```
 sudo adduser --disabled-password faux
 
-sudo apt install -y aptitude apt-mirror build-essential git curl e2fsprogs python3 awscli postgresql pigz capnproto ncdu iotop linux-tools-$(uname -r) linux-tools-aws
+sudo apt install -y aptitude apt-mirror build-essential git curl e2fsprogs python3 awscli postgresql pigz capnproto ncdu iotop linux-tools-$(uname -r) linux-tools-aws mdadm
 
 sudo -u postgres createuser faux
 sudo -u postgres createdb faux -O faux
@@ -9,11 +9,22 @@ sudo -u postgres createdb faux -O faux
 
 ```
 # drive setup...
+# small
 
 sudo mkfs.ext4 /dev/nvme0n1
-sudo mkdir /mnt/data
 sudo mount -o nobarrier /dev/nvme0n1 /mnt/data
+
+# big
+mdadm --create --verbose /dev/md0 --level=stripe --raid-devices=2 /dev/nvme?n1
+sudo mkfs.ext4 /dev/md0
+sudo mount -o nobarrier /dev/md0 /mnt/data
+
+
+sudo mkdir /mnt/data
 sudo chown faux:faux /mnt/data
+
+# ?
+sudo mount /dev/xvdf /mnt/data/apt-mirror
 ```
 
 /etc/apt/mirror.conf
