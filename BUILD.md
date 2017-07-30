@@ -3,7 +3,7 @@ sudo adduser --disabled-password faux
 
 sudo apt update
 sudo apt dist-upgrade -y
-sudo apt install -y aptitude apt-mirror build-essential git curl e2fsprogs python3 awscli postgresql pigz capnproto ncdu iotop linux-tools-$(uname -r) linux-tools-aws mdadm iftop
+sudo apt install -y aptitude apt-mirror build-essential git curl e2fsprogs xfsprogs python3 awscli postgresql pigz capnproto ncdu iotop linux-tools-$(uname -r) linux-tools-aws mdadm iftop
 
 sudo -u postgres createuser faux
 sudo -u postgres createdb faux -O faux
@@ -17,14 +17,16 @@ sudo chown faux:faux /mnt/data
 
 # small
 
-sudo mkfs.ext4 /dev/nvme0n1
+# sudo mkfs.ext4 -E nodiscard /dev/nvme0n1
+sudo mkfs.xfs -K /dev/nvme0n1
 sudo mount -o nobarrier /dev/nvme0n1 /mnt/data
 
 # big
 sudo umount /mnt
 sudo mdadm --create --verbose /dev/md0 --level=stripe --raid-devices=2 /dev/xvdb /dev/xvdc
 sudo mdadm --create --verbose /dev/md0 --level=stripe --raid-devices=2 /dev/nvme?n1
-sudo mkfs.ext4 /dev/md0
+# sudo mkfs.ext4 -E nodiscard /dev/md0
+sudo mkfs.xfs -K /dev/md0
 sudo mount -o nobarrier /dev/md0 /mnt/data
 
 

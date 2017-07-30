@@ -11,8 +11,8 @@ import traceback
 from email.message import Message
 from email.parser import Parser
 
-GEN = os.path.expanduser('~/code/contentin/target/release/ci-gen')
-WRITE = os.path.expanduser('~/code/deb2pg/target/release/deb2pg-ingest')
+GEN = os.path.expanduser('~/bin/ci-gen')
+WRITE = os.path.expanduser('~/bin/deb2pg-ingest')
 
 FILES_LINE = re.compile(' [0-9a-f]{32} \d+ ([^ ]+)')
 
