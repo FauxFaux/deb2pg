@@ -31,9 +31,9 @@ def main():
             gen = subprocess.Popen([GEN] + files, cwd=in_dir, stdout=subprocess.PIPE)
             consume = subprocess.Popen([WRITE, name, version], stdin=gen.stdout)
 
-            if 0 != gen.wait(180):
+            if 0 != gen.wait(10 * 60):
                 raise Exception('gen failed')
-            if 0 != consume.wait(120):
+            if 0 != consume.wait(3 * 60):
                 raise Exception('consume failed')
 
         except Exception as e:
