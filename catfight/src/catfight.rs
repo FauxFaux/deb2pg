@@ -136,11 +136,17 @@ pub fn store(blocksize: u64, src: &mut File, dest_root: &str, extra: &[u8]) -> R
     )
 }
 
-pub fn writey_write(mut fd: &mut File, file_end: &mut u64, src: &mut File, src_len: u64, extra: &[u8]) -> Result<()> {
+pub fn writey_write(
+    mut fd: &mut File,
+    file_end: &mut u64,
+    src: &mut File,
+    src_len: u64,
+    extra: &[u8],
+) -> Result<()> {
     ensure!(
-            0 == *file_end % 16,
-            ErrorKind::InvalidState(format!("unaligned file: {}", file_end))
-        );
+        0 == *file_end % 16,
+        ErrorKind::InvalidState(format!("unaligned file: {}", file_end))
+    );
 
     if 0 == *file_end {
         // we locked a new file, write a header

@@ -53,11 +53,12 @@ impl<'i> Index<'i> {
             };
 
 
-            let (size_hint, addendum) = names::addendum_from_path(path.file_name().unwrap().to_str().unwrap());
-//            if size_hint > 4 {
-//                println!("limited size index: excluding files in {:?}", path);
-//                continue;
-//            }
+            let (size_hint, addendum) =
+                names::addendum_from_path(path.file_name().unwrap().to_str().unwrap());
+            //            if size_hint > 4 {
+            //                println!("limited size index: excluding files in {:?}", path);
+            //                continue;
+            //            }
 
             let map = memmap::Mmap::open_path(path, memmap::Protection::Read)?;
 
@@ -136,10 +137,12 @@ impl<'i> Index<'i> {
         let mut grepped = 0u64;
         let target = tri::trigrams_full(search);
         for file in &self.files {
-            let this_file = find_intersection(target
-                .iter()
-                .map(|tri| file.by_tri[*tri as usize].iter().peekable())
-                .collect());
+            let this_file = find_intersection(
+                target
+                    .iter()
+                    .map(|tri| file.by_tri[*tri as usize].iter().peekable())
+                    .collect(),
+            );
 
             let mut pack = fs::File::open(&file.pack).expect("pack shouldn't be deleted ever");
             for local in this_file {
@@ -177,9 +180,11 @@ fn find_intersection(mut slices: Vec<iter::Peekable<slice::Iter<u32>>>) -> Vec<u
         let mut max = std::u32::MIN;
         for slice in &mut slices {
             match slice.peek() {
-                Some(val) => if **val > max {
-                    max = **val;
-                },
+                Some(val) => {
+                    if **val > max {
+                        max = **val;
+                    }
+                }
                 None => return intersection,
             }
         }
@@ -222,9 +227,8 @@ mod tests {
         let d1 = [1, 2, 3, 4, 6];
         let d2 = [2, 3, 4, 6];
         let d3 = [1, 2, 3, 4, 5];
-        assert_eq!(vec![
-            2, 3, 4
-        ],
+        assert_eq!(
+            vec![2, 3, 4],
             find_intersection(vec![
                 d1.iter().peekable(),
                 d2.iter().peekable(),

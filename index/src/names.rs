@@ -22,7 +22,11 @@ pub fn magic_offset_only(len: u64, text: bool) -> u8 {
 
 pub fn name_for_magic(mut magic: u8) -> String {
     assert!(magic < 16);
-    format!("{}-{}", text_otherwise_bin(magic >= SHARD_NO_TEXT_OFFSET), magic % SHARD_NO_TEXT_OFFSET + MIN_SHARD_NO)
+    format!(
+        "{}-{}",
+        text_otherwise_bin(magic >= SHARD_NO_TEXT_OFFSET),
+        magic % SHARD_NO_TEXT_OFFSET + MIN_SHARD_NO
+    )
 }
 
 /// Returns the base filename, and the magic value (0-15) added to a position.
@@ -47,7 +51,12 @@ pub fn filename_for(pos: u64) -> (String, u32) {
     let file_number = real_pos / BLOCK_SIZE;
     let file_pos = (real_pos % BLOCK_SIZE) as u32;
 
-    let file_name = format!("{}-{}.{:010}.cfp", text_otherwise_bin(text), magic, file_number);
+    let file_name = format!(
+        "{}-{}.{:010}.cfp",
+        text_otherwise_bin(text),
+        magic,
+        file_number
+    );
     (file_name, file_pos)
 }
 
@@ -67,12 +76,14 @@ pub fn addendum_from_path(path: &str) -> (u8, u64) {
     assert!(size_raw >= 2 - 2 && size_raw <= 9 - 2);
     assert_eq!('.', it.next().unwrap());
 
-    (size_raw + 2,
+    (
+        size_raw + 2,
         // TODO: NO JUST NO WHY
         it.take("0000000000000000000000".len())
             .collect::<String>()
             .parse::<u64>()
-            .expect("second num") * 1024 * 1024 * 1024 + (size_raw as u64) + if text { 8 } else { 0 }
+            .expect("second num") * 1024 * 1024 * 1024 + (size_raw as u64) +
+            if text { 8 } else { 0 },
     )
 }
 
