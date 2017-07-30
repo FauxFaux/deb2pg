@@ -1,5 +1,6 @@
 use std::fs;
 use std::io;
+use std::path::Path;
 
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -102,9 +103,9 @@ pub struct TempFile {
     pub name: String,
 }
 
-pub fn read(out_dir: &str) -> Result<(Vec<TempFile>)> {
-    {
-        let alphabet_chars = "abcdefghijklmnopqrstuvwxyz234567";
+pub fn read(out_dir: &str) -> Result<Vec<TempFile>> {
+    if !Path::new(format!("{}/zz", out_dir).as_str()).is_dir() {
+        let alphabet_chars = "234567abcdefghijklmnopqrstuvwxyz";
         for first in alphabet_chars.chars() {
             for second in alphabet_chars.chars() {
                 fs::create_dir_all(format!("{}/{}{}", out_dir, first, second))
