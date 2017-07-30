@@ -47,7 +47,7 @@ impl ShardedStore {
 
         if self.shards[magic as usize].is_none() {
             self.shards[magic as usize] = Some(Shard {
-                file: open_or_create_pack(&self.base_path, magic)?,
+                file: open_or_create_pack(&self.base_path, magic, 0)?,
                 nth: 0,
             });
         }
@@ -70,22 +70,24 @@ fn fill_shard(shard: &mut Shard, src: &mut File, src_len: u64, extra: &[u8], bas
         let mut file_end: u64 = shard.file.seek(SeekFrom::End(0)).expect("seek on locked file");
 
         if file_end >= CHUNK_LEN_MAX {
+            // release flock by closing file
             *shard = Shard {
-                file: open_or_create_pack(base_path, magic)?,
+                file: open_or_create_pack(base_path, magic, shard.nth as u64 + 1)?,
                 nth: shard.nth + 1,
             };
             continue;
         }
 
+        // release flock during write
         catfight::writey_write(&mut shard.file, &mut file_end, src, src_len, extra)?;
 
         return Ok(shard.nth as u64 * CHUNK_LEN_MAX + file_end);
     }
 }
 
-fn open_or_create_pack<P: AsRef<Path>>(base_path: P, magic: u8) -> io::Result<File> {
+fn open_or_create_pack<P: AsRef<Path>>(base_path: P, magic: u8, nth: u64) -> io::Result<File> {
     let mut new_path = base_path.as_ref().to_path_buf();
-    new_path.push(names::name_for_magic(magic));
+    new_path.push(format!("{}.{:010}.cfp", names::name_for_magic(magic), nth));
     return fs::OpenOptions::new().create(true).write(true).open(new_path);
 
     #[cfg(never)]

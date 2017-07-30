@@ -34,7 +34,7 @@ fn run() -> Result<i32> {
     let package_name = env::args().nth(1).unwrap();
     let package_version = env::args().nth(2).unwrap();
 
-    let out_dir = "/mnt/data/t/".to_string();
+    let out_dir = "/mnt/data/t".to_string();
     let container_info = format!(
         "{{'type': 'debian', 'package': '{}', 'version': '{}'}}",
         package_name,
@@ -168,14 +168,11 @@ SELECT pg_advisory_unlock(18787)
         ));
     }
 
-    let shard_id = index::names::magic_offset_only(file.header.len, file.text);
-
-    let pos = (shard_id as u64) +
-        store.store(
-            &mut fs::File::open(&file.name)?,
-            file.text,
-            &file.hash,
-        )?;
+    let pos = store.store(
+        &mut fs::File::open(&file.name)?,
+        file.text,
+        &file.hash,
+    )?;
 
     curr.prepare_cached(
         "

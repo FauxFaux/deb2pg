@@ -47,7 +47,7 @@ pub fn filename_for(pos: u64) -> (String, u32) {
     let file_number = real_pos / BLOCK_SIZE;
     let file_pos = (real_pos % BLOCK_SIZE) as u32;
 
-    let file_name = format!("{}-{}.{:022}", text_otherwise_bin(text), magic, file_number);
+    let file_name = format!("{}-{}.{:010}.cfp", text_otherwise_bin(text), magic, file_number);
     (file_name, file_pos)
 }
 

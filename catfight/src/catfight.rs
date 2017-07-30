@@ -111,7 +111,7 @@ pub fn store(blocksize: u64, src: &mut File, dest_root: &str, extra: &[u8]) -> R
         .len();
 
     for target_num in 0..std::u64::MAX {
-        let target_path = format!("{}.{:022}", dest_root, target_num);
+        let target_path = format!("{}.{:010}.cfp", dest_root, target_num);
         let mut fd = std::fs::OpenOptions::new()
             .write(true)
             .create(true)

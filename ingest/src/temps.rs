@@ -104,14 +104,16 @@ pub struct TempFile {
 }
 
 pub fn read(out_dir: &str) -> Result<Vec<TempFile>> {
+    let temp_dir = format!("{}/tmp", out_dir);
+
     if !Path::new(format!("{}/zz", out_dir).as_str()).is_dir() {
         let alphabet_chars = "234567abcdefghijklmnopqrstuvwxyz";
         for first in alphabet_chars.chars() {
             for second in alphabet_chars.chars() {
-                fs::create_dir_all(format!("{}/{}{}", out_dir, first, second))
-                    .expect("intermediate dir");
+                fs::create_dir_all(format!("{}/{}{}", out_dir, first, second))?;
             }
         }
+        fs::create_dir_all(&temp_dir)?;
     }
 
     let store: Vec<TempFile> = vec![];
@@ -131,7 +133,7 @@ pub fn read(out_dir: &str) -> Result<Vec<TempFile>> {
 
         let mut temp = tempfile::NamedTempFileOptions::new()
             .suffix(".tmp")
-            .create_in(&out_dir)
+            .create_in(&temp_dir)
             .expect("temp file");
 
         if en.len < 16 * 1024 * 1024 {

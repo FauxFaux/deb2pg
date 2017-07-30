@@ -34,7 +34,7 @@ fn hello_world() {
     );
 
     // implementation detail: file name
-    let mut archive = fs::File::open(dir.path().join("a.0000000000000000000000")).unwrap();
+    let mut archive = fs::File::open(dir.path().join("a.0000000000")).unwrap();
     archive.seek(SeekFrom::Start(FILE_HEADER_LEN)).unwrap();
     {
         let mut record = catfight::read_record(&mut archive).unwrap().unwrap();
