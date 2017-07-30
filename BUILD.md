@@ -3,16 +3,20 @@ sudo adduser --disabled-password faux
 
 sudo apt update
 sudo apt dist-upgrade -y
-sudo apt install -y aptitude apt-mirror build-essential git curl e2fsprogs xfsprogs python3 awscli postgresql pigz capnproto ncdu iotop linux-tools-$(uname -r) linux-tools-aws mdadm iftop
+sudo apt install -y aptitude apt-mirror build-essential git curl e2fsprogs xfsprogs python3 awscli postgresql pigz capnproto ncdu iotop linux-tools-$(uname -r) mdadm iftop
 
 sudo -u postgres createuser faux
 sudo -u postgres createdb faux -O faux
 ```
 
 ```
+for f in /sys/block/*; do echo noop | sudo tee $f/queue/scheduler; done
+echo 128000000 | sudo tee /proc/sys/kernel/sched_latency_ns
+```
+
+```
 # drive setup...
 sudo mkdir /mnt/data
-sudo chown faux:faux /mnt/data
 
 
 # small
@@ -29,10 +33,10 @@ sudo mdadm --create --verbose /dev/md0 --level=stripe --raid-devices=2 /dev/nvme
 sudo mkfs.xfs -K /dev/md0
 sudo mount -o nobarrier /dev/md0 /mnt/data
 
-
+sudo chown faux:faux /mnt/data
 
 # ?
-sudo mount /dev/xvdf /mnt/mirror
+sudo mkdir /mnt/mirror && sudo mount -o ro /dev/xvdf /mnt/mirror
 ```
 
 /etc/apt/mirror.list
@@ -46,10 +50,10 @@ clean http://cloudfront.debian.net/debian
 
 ```
 sudo systemctl stop postgresql
-sudo mv /var/lib/postgresql/9.5/main /mnt/data/main
-sudo ln -s /mnt/data/main /var/lib/postgresql/9.5/ 
+sudo mv /var/lib/postgresql/9.6/main /mnt/data/main
+sudo ln -s /mnt/data/main /var/lib/postgresql/9.6/ 
 
-sudo vim /etc/postgresql/9.5/main/postgresql.conf
+sudo vim /etc/postgresql/9.?/main/postgresql.conf
 shared_buffers = 1GB
 max_wal_size = 128GB
 work_mem = 50MB
@@ -78,7 +82,11 @@ curl https://sh.rustup.rs -sSf | sh
 
 .. exit and su again
 
-mkdir /mnt/data/t
+mkdir /mnt/data/t ~/bin
+# scp ~/code/contentin/target/release/ci-gen ~/code/deb2pg/target/release/deb2pg-ingest ~/code/deb2pg/ingest.py dxr1:
+# sudo mv *-* ingest.py ~faux/bin && sudo chmod a+rx -R ~faux/bin
+
+
 mkdir code
 cd code
 git clone https://github.com/FauxFaux/deb2pg
@@ -86,7 +94,7 @@ git clone https://github.com/FauxFaux/contentin
 (cd deb2pg; cargo build --all --release)
 (cd contentin; cargo build --all --release)
 cd deb2pg
-rm ingest.log; rm ~/failure.log; time find /mnt/data/apt-mirror -name \*.dsc -print0 | nice ionice xargs -0P16 -n20 python3 ingest.py 2>&1 | tee -a ingest.log
+rm ingest.log; rm ~/failure.log; time find /mnt/mirror -name \*.dsc -print0 | nice ionice xargs -0P16 -n20 python3 ingest.py 2>&1 | tee -a ingest.log
 ```
 
 
@@ -180,3 +188,73 @@ Totally awful test.
 ```
 
 Also doing about 1gb/minute. Definitely need to fix that open()/flock() thing. Maybe it's also causing the idle.
+
+### i3.4xlarge (16v, 120gb, dual 2t nvme; tweaking)
+
+Took ~30s for the spot request to be fulfilled, not unexpected given the bid price
+defaulting to the on-demand price.
+
+Tweaking:
+ * zesty (ami-254ba35c), so new kernel with nvme fixes, and postgres 9.6.
+   * https://cloud-images.ubuntu.com/locator/ec2/ "hvm:ebs-ssd zesty eu-west-1"
+ * xfs default settings
+ * noop scheduler (as recommended by xfs)
+ * increased scheduler max latency to 128ms.
+ * new code with reduced re-opening of files and locking
+ * temp dir moved to subdirectory, hoping to reduce inode contention
+
+But, also, no idea what I was measuring before. Total packs, or just text?
+Total seems more reasonable. It's also what the 106gb total is measured in.
+
+Bugs:
+ * Postgres reporting deadlocks in path_component
+ * Very, very occasional blob_pos collisions; blah. Kinda seeing these locally, too.
+
+Maybe /tmp is slow, slowing down ci-gen?
+I hope nothing ever gets flushed before getting deleted.
+Just in case:
+
+```
+sudo mount -t tmpfs -o nodev,nosuid,size=10G tmpfs /tmp
+```
+
+-P16:
+Still managed to generate ~30GB total of packs in 15 minutes. -> 53 minutes. \o/
+Sub hour, oh yeah, oh yeah.
+
+~48GB in 30 minutes -> 66 minutes. Blah.
+
+```
+ubuntu@ip-172-31-37-162:~$ sudo iostat -m
+Linux 4.10.0-28-generic (ip-172-31-37-162) 	07/30/2017 	_x86_64_	(16 CPU)
+
+avg-cpu:  %user   %nice %system %iowait  %steal   %idle
+           9.44   21.99   19.13    1.22    2.40   45.82
+
+Device:            tps    MB_read/s    MB_wrtn/s    MB_read    MB_wrtn
+xvda             84.20         0.12         8.03        258      17858
+nvme0n1        2316.89         0.01        44.55         32      99105
+nvme1n1        2313.36         0.01        44.54         32      99081
+md0            6640.48         0.03        89.08         56     198187
+xvdf            154.61        17.28         0.09      38448        209
+```
+
+
+
+-P8 shows a lot more idle CPU in `vmstat -w 10`:
+```
+12  0            0     78835288        42912     45199284    0    0  6717 67064 261781 276595  31  23  43   1   2
+ 9  0            0     78290192        42916     45635940    0    0  8741 82268 290660 299943  29  20  47   1   2
+``` 
+
+-P24 still has lots of idle; must be concurrency fail, not bad utilisation:
+```
+24  0            0     75418448        43224     46668904    0    0  4034 77007 241940 264895  36  20  40   1   2
+18  0            0     75130008        43228     47006564    0    0  9236 71527 199460 226152  37  23  37   1   2
+```
+
+
+When are we leaving temp files behind? ?? directories have thousands of files in
+*each* and take ages to cleanup between test runs.
+
+Instance doesn't automatically stop at the end of a defined-duration lease, oops.
