@@ -19,6 +19,10 @@ mod tri;
 pub use tri::trigrams_full;
 pub use tri::explain_packed;
 
+pub use shards::ShardedStore;
+
+pub use errors::*;
+
 #[cfg(test)]
 mod tests;
 

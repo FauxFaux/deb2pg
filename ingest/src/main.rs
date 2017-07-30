@@ -87,11 +87,14 @@ INSERT INTO container (info) VALUES (to_jsonb($1::text)) RETURNING id
 INSERT INTO file (container, pos, paths) VALUES ($1, $2, $3)
 ",
     )?;
+
+    let mut store = index::ShardedStore::new(out_dir);
+
     for (file, path) in temp_files.iter().zip(all_paths) {
         let pos: u64 = match blobs.entry(file.hash) {
             hash_map::Entry::Vacant(storable) => {
                 *storable.insert(maybe_store(
-                    out_dir.as_str(),
+                    &mut store,
                     file,
                     data_conn.transaction()?,
                 )?)
@@ -118,7 +121,7 @@ fn connect() -> Result<postgres::Connection> {
 /// Store the supplied `TempFile` in the appropriate shard in the `shard_root`,
 /// if it is not already present in the database.
 fn maybe_store(
-    shard_root: &str,
+    store: &mut index::ShardedStore,
     file: &TempFile,
     curr: postgres::transaction::Transaction,
 ) -> Result<u64> {
@@ -165,13 +168,12 @@ SELECT pg_advisory_unlock(18787)
         ));
     }
 
-    let (shard_name, shard_id) = index::names::magic_offset(file.header.len, file.text);
+    let shard_id = index::names::magic_offset_only(file.header.len, file.text);
 
     let pos = (shard_id as u64) +
-        catfight::store(
-            1024 * 1024 * 1024,
+        store.store(
             &mut fs::File::open(&file.name)?,
-            format!("{}/{}", shard_root, shard_name).as_str(),
+            file.text,
             &file.hash,
         )?;
 
@@ -264,6 +266,7 @@ mod errors {
 
         links {
             CatFight(::catfight::Error, ::catfight::ErrorKind);
+            Index(::index::Error, ::index::ErrorKind);
         }
 
         foreign_links {
