@@ -58,10 +58,9 @@ fn run() -> Result<i32> {
 
     let name_ids = write_names(
         &data_conn,
-        &all_paths
+        all_paths
             .iter()
-            .flat_map(|path| path.iter())
-            .collect::<Vec<&String>>(),
+            .flat_map(|path| path.iter()),
     )?;
 
     let mut blobs = HashMap::with_capacity(temp_files.len());
@@ -210,16 +209,15 @@ fn decompose(hash: [u8; 256 / 8]) -> (i64, i64, i64, i64) {
     )
 }
 
-// TODO: iterator
-fn write_names(conn: &postgres::Connection, wat: &[&String]) -> Result<HashMap<String, i64>> {
-    let tran = conn.transaction()?;
-    let write = tran.prepare(
+fn write_names<'i, I>(conn: &postgres::Connection, wat: I) -> Result<HashMap<String, i64>>
+where I: Iterator<Item=&'i String> {
+    let write = conn.prepare(
         "
 INSERT INTO path_component (path) VALUES ($1)
 ON CONFLICT DO NOTHING
 RETURNING id",
     )?;
-    let read_back = tran.prepare("SELECT id FROM path_component WHERE path=$1")?;
+    let read_back = conn.prepare("SELECT id FROM path_component WHERE path=$1")?;
 
     let mut map: HashMap<String, i64> = HashMap::new();
     for path in wat {
@@ -242,7 +240,6 @@ RETURNING id",
             vacancy.insert(id);
         }
     }
-    tran.commit()?;
     Ok(map)
 }
 
