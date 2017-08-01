@@ -97,6 +97,8 @@ INSERT INTO file (container, pos, paths) VALUES ($1, $2, $3)
             hash_map::Entry::Occupied(occupied) => *occupied.get(),
         };
 
+        fs::remove_file(&file.name)?;
+
         let path = path.iter().map(|part| name_ids[part]).collect::<Vec<i64>>();
         insert_file.execute(&[&container_id, &(pos as i64), &path])?;
     }
@@ -177,7 +179,6 @@ UPDATE blob SET pos=$1 WHERE h0=$2 AND h1=$3 AND h2=$4 AND h3=$5 AND len=$6
         .execute(&[&(pos as i64), &h0, &h1, &h2, &h3, &size])?;
 
     curr.commit()?;
-    fs::remove_file(&file.name)?;
     Ok(pos)
 }
 
