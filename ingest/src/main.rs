@@ -10,6 +10,7 @@ extern crate num_cpus;
 extern crate postgres;
 extern crate sha2;
 extern crate tempfile;
+extern crate tempfile_fast;
 extern crate thread_pool;
 
 mod simplify_path;

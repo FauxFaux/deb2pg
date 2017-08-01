@@ -11,7 +11,7 @@ use thread_pool;
 use lz4;
 use num_cpus;
 use sha2;
-use tempfile;
+use tempfile_fast;
 
 use errors::*;
 
@@ -104,8 +104,6 @@ pub struct TempFile {
 }
 
 pub fn read(out_dir: &str) -> Result<Vec<TempFile>> {
-    let temp_dir = format!("{}/tmp", out_dir);
-
     if !Path::new(format!("{}/zz", out_dir).as_str()).is_dir() {
         let alphabet_chars = "234567abcdefghijklmnopqrstuvwxyz";
         for first in alphabet_chars.chars() {
@@ -113,7 +111,6 @@ pub fn read(out_dir: &str) -> Result<Vec<TempFile>> {
                 fs::create_dir_all(format!("{}/{}{}", out_dir, first, second))?;
             }
         }
-        fs::create_dir_all(&temp_dir)?;
     }
 
     let store: Vec<TempFile> = vec![];
@@ -131,10 +128,7 @@ pub fn read(out_dir: &str) -> Result<Vec<TempFile>> {
             continue;
         }
 
-        let mut temp = tempfile::NamedTempFileOptions::new()
-            .suffix(".tmp")
-            .create_in(&temp_dir)
-            .expect("temp file");
+        let mut temp = tempfile_fast::persistable_tempfile_in(&out_dir)?;
 
         if en.len < 16 * 1024 * 1024 {
             let mut buf = vec![0u8; en.len as usize];
@@ -144,7 +138,7 @@ pub fn read(out_dir: &str) -> Result<Vec<TempFile>> {
             let dest = dest.clone();
             sender
                 .send(move || {
-                    let (hash, text) = hash_compress_write_from_slice(&buf, &mut temp);
+                    let (hash, text) = hash_compress_write_from_slice(&buf, temp.as_mut());
 
                     complete(en, temp, hash, out_dir.as_str(), text, &dest).unwrap();
                 })
@@ -152,7 +146,7 @@ pub fn read(out_dir: &str) -> Result<Vec<TempFile>> {
             pool_used = true;
         } else {
             let file_data = (&mut stdin).take(en.len);
-            let (total_read, hash, text) = hash_compress_write_from_reader(file_data, &mut temp);
+            let (total_read, hash, text) = hash_compress_write_from_reader(file_data, temp.as_mut());
             assert_eq!(en.len, total_read);
 
             complete(en, temp, hash, out_dir, text, &dest)?;
@@ -171,7 +165,7 @@ pub fn read(out_dir: &str) -> Result<Vec<TempFile>> {
 
 fn complete(
     en: ci_capnp::FileEntry,
-    temp: tempfile::NamedTempFile,
+    temp: tempfile_fast::PersistableTempFile,
     hash: [u8; 256 / 8],
     out_dir: &str,
     text: bool,
@@ -192,7 +186,7 @@ fn complete(
         if !written_to_path.exists() {
             if let Err(e) = temp.persist_noclobber(&written_to) {
                 if !written_to_path.exists() {
-                    bail!(Error::with_chain(e.error, "couldn't write hash file"));
+                    bail!(e);
                 }
             }
         }

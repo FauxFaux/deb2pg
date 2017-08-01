@@ -15,7 +15,6 @@ extern crate r2d2;
 extern crate r2d2_postgres;
 
 use std::fs;
-use std::io;
 use std::io::Read as IoRead;
 use std::io::Seek;
 use std::io::SeekFrom;
