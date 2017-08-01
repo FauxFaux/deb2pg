@@ -6,13 +6,10 @@ use std::iter;
 use std::path;
 use std::slice;
 
-use std::collections::HashSet;
-use std::io::Read;
 use std::io::Seek;
 use std::io::SeekFrom;
 
 use lz4;
-use twoway;
 
 use catfight;
 use grep;

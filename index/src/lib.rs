@@ -12,7 +12,6 @@ extern crate twoway;
 pub mod find;
 mod grep;
 pub mod names;
-mod search;
 mod shards;
 mod tri;
 
@@ -22,9 +21,6 @@ pub use tri::explain_packed;
 pub use shards::ShardedStore;
 
 pub use errors::*;
-
-#[cfg(test)]
-mod tests;
 
 mod errors {
     error_chain! {

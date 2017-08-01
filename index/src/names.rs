@@ -20,7 +20,7 @@ pub fn magic_offset_only(len: u64, text: bool) -> u8 {
     make_shard_magic(len) - MIN_SHARD_NO + if text { SHARD_NO_TEXT_OFFSET } else { 0 }
 }
 
-pub fn name_for_magic(mut magic: u8) -> String {
+pub fn name_for_magic(magic: u8) -> String {
     assert!(magic < 16);
     format!(
         "{}-{}",

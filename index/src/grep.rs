@@ -11,7 +11,7 @@ use std::io::Read;
 /// retain 2 characters?
 /// "oBAR" -> 2, plus 4 - 2 -> 4?
 /// Worst example ever.
-pub fn reader_contains<R: Read>(needle: &[u8], mut haystack: R) -> io::Result<Option<u64>> {
+pub fn reader_contains<R: Read>(needle: &[u8], haystack: R) -> io::Result<Option<u64>> {
     reader_contains_external_buf(needle, haystack, &mut [0u8; 16 * 1024])
 }
 

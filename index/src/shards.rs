@@ -8,7 +8,6 @@ use std::io;
 use std::fs;
 use std::io::Seek;
 use std::io::SeekFrom;
-use std::io::Write;
 
 use errors::*;
 use names;
