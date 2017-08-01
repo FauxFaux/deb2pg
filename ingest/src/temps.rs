@@ -186,7 +186,17 @@ fn complete(
     );
     let len = temp.metadata()?.len();
 
-    temp.persist(&written_to).expect("rename");
+    {
+        let written_to_path = Path::new(&written_to);
+
+        if !written_to_path.exists() {
+            if let Err(e) = temp.persist_noclobber(&written_to) {
+                if !written_to_path.exists() {
+                    bail!(Error::with_chain(e.error, "couldn't write hash file"));
+                }
+            }
+        }
+    }
 
     store.lock().unwrap().push(TempFile {
         header: en,
