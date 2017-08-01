@@ -105,37 +105,6 @@ pub fn unlock_flock(what: &File) -> Result<()> {
     }
 }
 
-pub fn store(blocksize: u64, src: &mut File, dest_root: &str, extra: &[u8]) -> Result<u64> {
-    let src_len: u64 = src.metadata()
-        .chain_err(|| "couldn't stat source file")?
-        .len();
-
-    for target_num in 0..std::u64::MAX {
-        let target_path = format!("{}.{:010}.cfp", dest_root, target_num);
-        let mut fd = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .open(target_path.as_str())
-            .unwrap();
-
-        flock(&fd)?;
-
-        let mut file_end: u64 = fd.seek(io::SeekFrom::End(0))?;
-
-        if file_end >= blocksize {
-            continue;
-        }
-
-        writey_write(&mut fd, &mut file_end, src, src_len, extra)?;
-
-        return Ok(target_num * blocksize + file_end);
-    }
-
-    Err(
-        ErrorKind::InvalidState("ran out of files".to_string()).into(),
-    )
-}
-
 pub fn writey_write(
     mut fd: &mut File,
     file_end: &mut u64,
