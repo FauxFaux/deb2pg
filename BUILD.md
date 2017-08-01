@@ -12,6 +12,7 @@ sudo -u postgres createdb faux -O faux
 ```
 for f in /sys/block/*; do echo noop | sudo tee $f/queue/scheduler; done
 echo 128000000 | sudo tee /proc/sys/kernel/sched_latency_ns
+sudo mount -t tmpfs -o nodev,nosuid,size=10G tmpfs /tmp
 ```
 
 ```
@@ -258,3 +259,13 @@ When are we leaving temp files behind? ?? directories have thousands of files in
 *each* and take ages to cleanup between test runs.
 
 Instance doesn't automatically stop at the end of a defined-duration lease, oops.
+
+### i3.4xlarge (16v, 120gb, dual 2t nvme; tweaking)
+
+And again, this time without deadlocky `path_component` code,
+ and with a better attempt at unlinking hash files.. seems.. not faster.
+ 
+Might be time to dump this mutli-phase process, it's essentially pointless, right? 
+ 
+unlinking is actually pretty slow, 0.5-14ms typically. In a hot loop. Bastards.
+1ms * 1_000 files is a whole second wasted.

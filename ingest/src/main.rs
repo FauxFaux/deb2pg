@@ -98,7 +98,7 @@ INSERT INTO file (container, pos, paths) VALUES ($1, $2, $3)
             hash_map::Entry::Occupied(occupied) => *occupied.get(),
         };
 
-        fs::remove_file(&file.name)?;
+        let _ = fs::remove_file(&file.name);
 
         let path = path.iter().map(|part| name_ids[part]).collect::<Vec<i64>>();
         insert_file.execute(&[&container_id, &(pos as i64), &path])?;
@@ -160,7 +160,6 @@ SELECT pg_advisory_unlock(18787)
 
     if done == 0 {
         // we didn't insert the row, so no need to do anything
-        fs::remove_file(&file.name)?;
         return Ok(fetch(&curr, h0, h1, h2, h3, size)?.expect(
             "we just checked it was there...",
         ));
