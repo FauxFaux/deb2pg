@@ -119,7 +119,6 @@ fn fill_tris(temp_index: &[TempFileChunk], temp_data: &[Tri], tris: &mut HashMap
 
     // For every document...
     for part in temp_index {
-
         // Work out what part of its trigrams we even need to look at...
         let subslice = &temp_data[run..(run + (part.num_tris as usize))];
         let mut start = match subslice.binary_search(&min) {
@@ -130,10 +129,9 @@ fn fill_tris(temp_index: &[TempFileChunk], temp_data: &[Tri], tris: &mut HashMap
             start -= 2;
         }
 
-        let end = start +
-            match subslice[start..].binary_search(&max) {
-                Ok(idx) | Err(idx) => idx,
-            } + 1;
+        let end = start + match subslice[start..].binary_search(&max) {
+            Ok(idx) | Err(idx) => idx,
+        } + 1;
 
         let end = if end > subslice.len() {
             subslice.len()
@@ -183,7 +181,6 @@ fn main() {
 
     // Let's do this in blocks, so we don't run out of memory.
     loop {
-
         // Select a block of trigrams to process, and allocate space for their documents.
         let mut tri_poses = take_some(&mut trigram_count);
 

@@ -138,20 +138,18 @@ fn add(into: &mut HashMap<String, Node>, remaining: &[&String], pos: usize) {
         1 => {
             into.insert(remaining[0].to_string(), Node::File(pos));
         }
-        _ => {
-            match into.entry(remaining[0].to_string()) {
-                hash_map::Entry::Occupied(mut exists) => {
-                    if let Node::Dir(ref mut map) = *exists.get_mut() {
-                        add(map, &remaining[1..], pos);
-                    }
-                }
-                hash_map::Entry::Vacant(vacant) => {
-                    let mut map = HashMap::new();
-                    add(&mut map, &remaining[1..], pos);
-                    vacant.insert(Node::Dir(map));
+        _ => match into.entry(remaining[0].to_string()) {
+            hash_map::Entry::Occupied(mut exists) => {
+                if let Node::Dir(ref mut map) = *exists.get_mut() {
+                    add(map, &remaining[1..], pos);
                 }
             }
-        }
+            hash_map::Entry::Vacant(vacant) => {
+                let mut map = HashMap::new();
+                add(&mut map, &remaining[1..], pos);
+                vacant.insert(Node::Dir(map));
+            }
+        },
     }
 }
 
@@ -179,18 +177,15 @@ mod tests {
 
     #[test]
     fn trial() {
-        for out in simplify(refify(&to_vec(
-            &[
-                &["some.dsc"],
-                &["foo.tar", "foo-1337/"],
-                &["foo.tar", "foo-1337/Makefile"],
-                &["foo.tar", "foo-1337/src/main.c"],
-                &["foo.tar", "foo-1337/src/help.h"],
-                &["foo.tar", "foo-1337/some.jar", "MANIFEST.MF"],
-                &["other.dsc"],
-            ],
-        )))
-        {
+        for out in simplify(refify(&to_vec(&[
+            &["some.dsc"],
+            &["foo.tar", "foo-1337/"],
+            &["foo.tar", "foo-1337/Makefile"],
+            &["foo.tar", "foo-1337/src/main.c"],
+            &["foo.tar", "foo-1337/src/help.h"],
+            &["foo.tar", "foo-1337/some.jar", "MANIFEST.MF"],
+            &["other.dsc"],
+        ]))) {
             println!("{:?}", out);
         }
     }

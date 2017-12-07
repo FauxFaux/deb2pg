@@ -67,7 +67,6 @@ mod tests {
 
     #[test]
     fn single_block() {
-
         assert_eq!(
             Some(0),
             reader_contains("Inches".as_bytes(), cursor(MSG)).unwrap()

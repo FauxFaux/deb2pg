@@ -1,4 +1,4 @@
-use std::cmp::{min, max};
+use std::cmp::{max, min};
 
 const BLOCK_SIZE: u64 = 1024 * 1024 * 1024;
 const MIN_SHARD_NO: u8 = 2;
@@ -13,7 +13,11 @@ fn make_shard_magic(size: u64) -> u8 {
 }
 
 fn text_otherwise_bin(text: bool) -> &'static str {
-    if text { "text" } else { "bin" }
+    if text {
+        "text"
+    } else {
+        "bin"
+    }
 }
 
 pub fn magic_offset_only(len: u64, text: bool) -> u8 {
@@ -82,8 +86,11 @@ pub fn addendum_from_path(path: &str) -> (u8, u64) {
         it.take("0000000000000000000000".len())
             .collect::<String>()
             .parse::<u64>()
-            .expect("second num") * 1024 * 1024 * 1024 + (size_raw as u64) +
-            if text { 8 } else { 0 },
+            .expect("second num") * 1024 * 1024 * 1024 + (size_raw as u64) + if text {
+            8
+        } else {
+            0
+        },
     )
 }
 

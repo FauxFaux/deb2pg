@@ -45,8 +45,7 @@ where
         let mut byte = [0u8, 1];
         if 0 != self.reader.read(&mut byte)? {
             bail!(ErrorKind::InvalidState(
-                "can't complete until the 'reader' has been fully read"
-                    .to_string(),
+                "can't complete until the 'reader' has been fully read".to_string(),
             ));
         }
 

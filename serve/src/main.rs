@@ -4,15 +4,15 @@ extern crate index;
 extern crate iron;
 extern crate logger;
 extern crate lz4;
+extern crate persistent;
+extern crate postgres;
+extern crate r2d2;
+extern crate r2d2_postgres;
 extern crate router;
 #[macro_use]
 extern crate serde_json;
 extern crate stderrlog;
 extern crate url;
-extern crate persistent;
-extern crate postgres;
-extern crate r2d2;
-extern crate r2d2_postgres;
 
 use std::fs;
 use std::io::Read as IoRead;
@@ -143,7 +143,6 @@ fn cat(req: &mut Request) -> IronResult<Response> {
         }
         _ => unimplemented!(),
     }
-
 }
 
 fn paths(req: &mut Request) -> IronResult<Response> {
@@ -166,9 +165,8 @@ fn paths(req: &mut Request) -> IronResult<Response> {
 
     let mut max_id = 0;
 
-    let stat = conn.prepare_cached(
-        "SELECT id, paths FROM file WHERE pos=$1 ORDER BY id LIMIT 501",
-    ).unwrap();
+    let stat = conn.prepare_cached("SELECT id, paths FROM file WHERE pos=$1 ORDER BY id LIMIT 501")
+        .unwrap();
 
     for row in stat.query(&[&pos]).unwrap().into_iter() {
         let row = First {

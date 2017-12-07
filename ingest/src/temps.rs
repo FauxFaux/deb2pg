@@ -146,7 +146,8 @@ pub fn read(out_dir: &str) -> Result<Vec<TempFile>> {
             pool_used = true;
         } else {
             let file_data = (&mut stdin).take(en.len);
-            let (total_read, hash, text) = hash_compress_write_from_reader(file_data, temp.as_mut());
+            let (total_read, hash, text) =
+                hash_compress_write_from_reader(file_data, temp.as_mut());
             assert_eq!(en.len, total_read);
 
             complete(en, temp, hash, out_dir, text, &dest)?;

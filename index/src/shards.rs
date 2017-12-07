@@ -80,9 +80,10 @@ fn fill_shard(
     loop {
         catfight::flock(&shard.file)?;
 
-        let mut file_end: u64 = shard.file.seek(SeekFrom::End(0)).expect(
-            "seek on locked file",
-        );
+        let mut file_end: u64 = shard
+            .file
+            .seek(SeekFrom::End(0))
+            .expect("seek on locked file");
 
         if file_end >= CHUNK_LEN_MAX {
             // release flock by closing file
@@ -103,14 +104,17 @@ fn fill_shard(
 fn open_or_create_pack<P: AsRef<Path>>(base_path: P, magic: u8, nth: u64) -> io::Result<File> {
     let mut new_path = base_path.as_ref().to_path_buf();
     new_path.push(format!("{}.{:010}.cfp", names::name_for_magic(magic), nth));
-    return fs::OpenOptions::new().create(true).write(true).open(
-        new_path,
-    );
+    return fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .open(new_path);
 
     #[cfg(never)]
-    match fs::OpenOptions::new().create_new(true).write(true).open(
-        new_path,
-    ) {
+    match fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(new_path)
+    {
         Ok(mut file) => {
             file.write(b"\0...")?;
             Ok(file)

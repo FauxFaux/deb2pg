@@ -3,7 +3,7 @@ use libc;
 use std;
 use std::io;
 use std::fs::File;
-use std::os::unix::io::{RawFd, AsRawFd};
+use std::os::unix::io::{AsRawFd, RawFd};
 
 enum CopyFailure {
     Unsupported,
@@ -51,7 +51,6 @@ fn try_sendfile(src: &File, dest: &MyRawFd, len: u64) -> Result<(), CopyFailure>
                     if len == remaining && (libc::EINVAL == code || libc::ENOSYS == code) {
                         return Err(CopyFailure::Unsupported);
                     }
-
                 }
 
                 return Err(CopyFailure::Errno(error));
@@ -76,12 +75,10 @@ pub fn copy_file<T: MyRawFd + io::Write>(
 
     match try_sendfile(src, dest, len) {
         Ok(()) => return Ok(()),
-        Err(fail) => {
-            match fail {
-                CopyFailure::Errno(x) => return Err(x),
-                CopyFailure::Unsupported => (),
-            }
-        }
+        Err(fail) => match fail {
+            CopyFailure::Errno(x) => return Err(x),
+            CopyFailure::Unsupported => (),
+        },
     };
 
     try_streams(src, dest, len).unwrap();

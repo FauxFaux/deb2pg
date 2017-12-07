@@ -106,7 +106,6 @@ impl<'i> Index<'i> {
 
                     cur += len as usize;
                 }
-
             }
 
             files.push(IndexFile {
@@ -122,9 +121,11 @@ impl<'i> Index<'i> {
     pub fn documents_for_tri(&self, tri: u32) -> Vec<u64> {
         let mut all = Vec::new();
         for file in &self.files {
-            all.extend(file.by_tri[tri as usize].iter().map(|x| {
-                *x as u64 + file.addendum
-            }));
+            all.extend(
+                file.by_tri[tri as usize]
+                    .iter()
+                    .map(|x| *x as u64 + file.addendum),
+            );
         }
         all
     }
@@ -158,7 +159,6 @@ impl<'i> Index<'i> {
                 }
                 grepped += 1;
             }
-
         }
         SearchResult {
             docs: matched,
@@ -177,11 +177,9 @@ fn find_intersection(mut slices: Vec<iter::Peekable<slice::Iter<u32>>>) -> Vec<u
         let mut max = std::u32::MIN;
         for slice in &mut slices {
             match slice.peek() {
-                Some(val) => {
-                    if **val > max {
-                        max = **val;
-                    }
-                }
+                Some(val) => if **val > max {
+                    max = **val;
+                },
                 None => return intersection,
             }
         }

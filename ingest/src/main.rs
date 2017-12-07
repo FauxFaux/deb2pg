@@ -57,12 +57,7 @@ fn run() -> Result<i32> {
 
     let data_conn = connect()?;
 
-    let name_ids = write_names(
-        &data_conn,
-        all_paths
-            .iter()
-            .flat_map(|path| path.iter()),
-    )?;
+    let name_ids = write_names(&data_conn, all_paths.iter().flat_map(|path| path.iter()))?;
 
     let mut blobs = HashMap::with_capacity(temp_files.len());
 
@@ -123,7 +118,6 @@ fn maybe_store(
     file: &TempFile,
     curr: postgres::transaction::Transaction,
 ) -> Result<u64> {
-
     // Postgres doesn't do unsigned.
     assert!(file.header.len <= std::i64::MAX as u64);
     let size = file.header.len as i64;
@@ -160,16 +154,10 @@ SELECT pg_advisory_unlock(18787)
 
     if done == 0 {
         // we didn't insert the row, so no need to do anything
-        return Ok(fetch(&curr, h0, h1, h2, h3, size)?.expect(
-            "we just checked it was there...",
-        ));
+        return Ok(fetch(&curr, h0, h1, h2, h3, size)?.expect("we just checked it was there..."));
     }
 
-    let pos = store.store(
-        &mut fs::File::open(&file.name)?,
-        file.text,
-        &file.hash,
-    )?;
+    let pos = store.store(&mut fs::File::open(&file.name)?, file.text, &file.hash)?;
 
     curr.prepare_cached(
         "
@@ -196,9 +184,12 @@ SELECT pos FROM blob WHERE h0=$1 AND h1=$2 AND h2=$3 AND h3=$4 AND len=$5
 ",
     )?;
     let result = statement.query(&[&h0, &h1, &h2, &h3, &len])?;
-    Ok(result.iter().next().map(
-        |row| row.get::<usize, i64>(0) as u64,
-    ))
+    Ok(
+        result
+            .iter()
+            .next()
+            .map(|row| row.get::<usize, i64>(0) as u64),
+    )
 }
 
 fn decompose(hash: [u8; 256 / 8]) -> (i64, i64, i64, i64) {
@@ -211,7 +202,9 @@ fn decompose(hash: [u8; 256 / 8]) -> (i64, i64, i64, i64) {
 }
 
 fn write_names<'i, I>(conn: &postgres::Connection, wat: I) -> Result<HashMap<String, i64>>
-where I: Iterator<Item=&'i String> {
+where
+    I: Iterator<Item = &'i String>,
+{
     let write = conn.prepare(
         "
 INSERT INTO path_component (path) VALUES ($1)
@@ -225,16 +218,12 @@ RETURNING id",
         if let hash_map::Entry::Vacant(vacancy) = map.entry(path.to_string()) {
             let id: i64 = match write.query(&[&path])?.iter().next() {
                 Some(row) => row.get(0),
-                None => {
-                    match read_back.query(&[&path])?.iter().next() {
-                        Some(row) => row.get(0),
-                        None => {
-                            bail!(ErrorKind::InvalidState(
-                                format!("didn't write and didn't find '{}'", path),
-                            ))
-                        }
-                    }
-                }
+                None => match read_back.query(&[&path])?.iter().next() {
+                    Some(row) => row.get(0),
+                    None => bail!(ErrorKind::InvalidState(
+                        format!("didn't write and didn't find '{}'", path),
+                    )),
+                },
             };
 
             assert!(id >= 0);
