@@ -262,7 +262,6 @@ mod errors {
 
         foreign_links {
             Io(::std::io::Error);
-            PgConnect(::postgres::error::ConnectError);
             Pg(::postgres::error::Error);
         }
     }

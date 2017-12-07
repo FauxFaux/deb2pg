@@ -1,12 +1,16 @@
 [package]
+authors = ["Chris West (Faux) <git@goeswhere.com>"]
 name = "deb2pg-reindex"
 version = "0.1.0"
-authors = ["Chris West (Faux) <git@goeswhere.com>"]
 
 [dependencies]
-byteorder = "1.0.0"
-catfight = { path = "../catfight" }
-index = { path = "../index" }
-lz4 = "1.21.0"
-memmap = "0.5.2"
-tempfile = "2.1.5"
+byteorder = "1"
+lz4 = "1"
+memmap = "0.5"
+tempfile = "2"
+
+[dependencies.catfight]
+path = "../catfight"
+
+[dependencies.index]
+path = "../index"

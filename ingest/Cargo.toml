@@ -1,19 +1,25 @@
 [package]
+authors = ["Chris West (Faux) <git@goeswhere.com>"]
 name = "deb2pg-ingest"
 version = "0.1.0"
-authors = ["Chris West (Faux) <git@goeswhere.com>"]
 
 [dependencies]
-ci-capnp = { path = "../../contentin/ci-capnp" }
-catfight = { path = "../catfight" }
-index = { path = "../index" }
-base32 = "0.3.1"
-byteorder = "1.0.0"
-error-chain = "0.10.0"
-lz4 = "1.21.0"
-num_cpus = "1.5.1"
-postgres = "0.14"
-sha2 = "0.6.0"
-tempfile = "2.1.5"
-tempfile-fast = "0.1.0"
-thread-pool = "0.1.1"
+base32 = "0.3"
+byteorder = "1"
+error-chain = "0.11"
+lz4 = "1"
+num_cpus = "1"
+postgres = "0.15"
+sha2 = "0.6"
+tempfile = "2"
+tempfile-fast = "0.1"
+thread-pool = "0.1"
+
+[dependencies.catfight]
+path = "../catfight"
+
+[dependencies.ci-capnp]
+path = "../../contentin/ci-capnp"
+
+[dependencies.index]
+path = "../index"

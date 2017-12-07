@@ -282,8 +282,7 @@ fn main() {
         "postgres://faux@%2Frun%2Fpostgresql",
         r2d2_postgres::TlsMode::None,
     ).unwrap();
-    let config = r2d2::Config::builder().pool_size(8).build();
-    let pool = r2d2::Pool::new(config, manager).unwrap();
+    let pool = r2d2::Pool::builder().max_size(8).build(manager).unwrap();
     std::mem::drop(pool.get().unwrap());
 
     let index = {

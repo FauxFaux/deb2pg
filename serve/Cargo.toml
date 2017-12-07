@@ -1,27 +1,25 @@
 [package]
+authors = ["Chris West (Faux) <git@goeswhere.com>"]
 name = "serve"
 version = "0.1.0"
-authors = ["Chris West (Faux) <git@goeswhere.com>"]
 
 [dependencies]
-catfight = { path = "../catfight" }
-index = { path = "../index" }
-byteorder = "1.0.0"
+byteorder = "1"
+iron = "~0.5"
+log = "0.3"
+logger = "0.3"
+lz4 = "1"
+persistent = "0.3"
+postgres = "0.15"
+r2d2 = "0.8"
+r2d2_postgres = "0.14"
+router = "~0.5"
+serde_json = "1"
+stderrlog = "0.2"
+url = "1"
 
-iron = "0.5.1"
-logger = "0.3.0"
-router = "0.5.1"
-persistent = "0.3.0"
+[dependencies.catfight]
+path = "../catfight"
 
-lz4 = "1.21.0"
-
-log = "0.3.8"
-stderrlog = "0.2.2"
-
-url = "1.5.1"
-
-postgres = "0.14.1"
-r2d2 = "0.7.2"
-r2d2_postgres = "0.12.0"
-
-serde_json = "1.0.2"
+[dependencies.index]
+path = "../index"
