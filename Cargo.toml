@@ -1,11 +1,6 @@
 [workspace]
 members = [
-    "catfight",
-    "index",
-    "indexstat",
     "ingest",
-    "reindex",
-    "serve",
 ]
 
 [profile.release]

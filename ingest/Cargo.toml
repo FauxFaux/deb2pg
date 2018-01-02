@@ -1,25 +1,18 @@
 [package]
 authors = ["Chris West (Faux) <git@goeswhere.com>"]
-name = "deb2pg-ingest"
+name = "deb3pg-ingest"
 version = "0.1.0"
 
 [dependencies]
-base32 = "0.3"
 byteorder = "1"
 error-chain = "0.11"
-lz4 = "1"
-num_cpus = "1"
+maplit = "1"
 postgres = "0.15"
-sha2 = "0.6"
+serde_json = "1.0"
+sha2 = "0.7"
 tempfile = "2"
 tempfile-fast = "0.1"
-thread-pool = "0.1"
+zstd = "0.4"
 
-[dependencies.catfight]
-path = "../catfight"
-
-[dependencies.ci-capnp]
-path = "../../contentin/ci-capnp"
-
-[dependencies.index]
-path = "../index"
+[dependencies.splayers]
+path = "../../splayers"

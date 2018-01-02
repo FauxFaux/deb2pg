@@ -1,20 +1,15 @@
-extern crate base32;
 extern crate byteorder;
-extern crate catfight;
-extern crate ci_capnp;
 #[macro_use]
 extern crate error_chain;
-extern crate index;
-extern crate lz4;
-extern crate num_cpus;
+#[macro_use]
+extern crate maplit;
 extern crate postgres;
+extern crate serde_json;
 extern crate sha2;
+extern crate splayers;
 extern crate tempfile;
 extern crate tempfile_fast;
-extern crate thread_pool;
-
-mod simplify_path;
-mod temps;
+extern crate zstd;
 
 use std::env;
 use std::fs;
@@ -24,42 +19,32 @@ use std::collections::HashMap;
 
 use byteorder::{ByteOrder, LittleEndian};
 
-use temps::TempFile;
+mod temps;
+mod store;
 
 use errors::*;
+use temps::TempFile;
 
-fn run() -> Result<i32> {
-    assert_eq!(3, env::args().len());
+fn run() -> Result<()> {
+    assert_eq!(4, env::args().len());
 
-    // TODO: JSON injection
     let package_name = env::args().nth(1).unwrap();
     let package_version = env::args().nth(2).unwrap();
+    let source = env::args().nth(3).unwrap();
 
     let out_dir = "/mnt/data/t".to_string();
-    let container_info = format!(
-        "{{'type': 'debian', 'package': '{}', 'version': '{}'}}",
-        package_name,
-        package_version
-    );
+    let container_info = serde_json::to_string(&hashmap! {
+        "type" => "debian",
+        "package" => &package_name,
+        "version" => &package_version,
+    })?;
 
-    let temp_files = temps::read(out_dir.as_str())?;
-
-    let all_paths = simplify_path::simplify(
-        temp_files
-            .iter()
-            .map(|temp| {
-                let mut just_paths: Vec<&String> = temp.header.paths.iter().collect();
-                just_paths.reverse();
-                just_paths
-            })
-            .collect(),
-    );
+    // Weird lifetime alarm: paths become invalid when this is dropped.
+    let temp_files = splayers::Unpack::unpack_into(source, &out_dir)?;
 
     let data_conn = connect()?;
 
-    let name_ids = write_names(&data_conn, all_paths.iter().flat_map(|path| path.iter()))?;
-
-    let mut blobs = HashMap::with_capacity(temp_files.len());
+    let mut blobs = HashMap::new();
 
     let meta_conn = connect()?;
     let meta_tran = meta_conn.transaction()?;
@@ -68,7 +53,8 @@ fn run() -> Result<i32> {
         .query(
             "
 INSERT INTO container (info) VALUES (to_jsonb($1::text)) RETURNING id
-",
+"
+                .trim(),
             &[&container_info.to_string()],
         )
         .chain_err(|| "inserting container info")?
@@ -80,28 +66,76 @@ INSERT INTO container (info) VALUES (to_jsonb($1::text)) RETURNING id
     let insert_file = meta_tran.prepare(
         "
 INSERT INTO file (container, pos, paths) VALUES ($1, $2, $3)
-",
+"
+            .trim(),
     )?;
 
-    let mut store = index::ShardedStore::new(out_dir);
+    let mut store = store::ShardedStore::new(out_dir);
 
-    for (file, path) in temp_files.iter().zip(all_paths) {
-        let pos: u64 = match blobs.entry(file.hash) {
-            hash_map::Entry::Vacant(storable) => {
-                *storable.insert(maybe_store(&mut store, file, data_conn.transaction()?)?)
-            }
-            hash_map::Entry::Occupied(occupied) => *occupied.get(),
-        };
-
-        let _ = fs::remove_file(&file.name);
-
-        let path = path.iter().map(|part| name_ids[part]).collect::<Vec<i64>>();
-        insert_file.execute(&[&container_id, &(pos as i64), &path])?;
+    match temp_files.status() {
+        &splayers::Status::Success(ref entries) => loopy(
+            entries,
+            &mut blobs,
+            &mut store,
+            data_conn,
+            &[],
+            insert_file,
+            container_id,
+        )?,
+        other => bail!("root must be unpackable, not {:?}", other),
     }
 
     meta_tran.commit()?;
 
-    Ok(0)
+    Ok(())
+}
+
+fn loopy(
+    entries: &[splayers::Entry],
+    blobs: &mut HashMap<[u8; 256 / 8], i64>,
+    store: &mut store::ShardedStore,
+    data_conn: postgres::Connection,
+    path: &[i64],
+    insert_file: postgres::stmt::Statement,
+    container_id: i64,
+) -> Result<()> {
+    let names = write_names(
+        &data_conn,
+        entries
+            .into_iter()
+            .map(|entry| String::from_utf8_lossy(&entry.local.path)),
+    )?;
+    for entry in entries {
+        if entry.local.temp.is_none() {
+            continue;
+        }
+
+        let file = match temps::hash_compress_write_from_reader(
+            fs::File::open(entry.local.temp.as_ref().unwrap())?,
+            store.locality(),
+        )? {
+            Some(x) => x,
+            None => continue,
+        };
+        let pos: i64 = match blobs.entry(file.hash) {
+            hash_map::Entry::Vacant(storable) => {
+                *storable.insert(maybe_store(store, &file, data_conn.transaction()?)?)
+            }
+            hash_map::Entry::Occupied(occupied) => *occupied.get(),
+        };
+
+        // TODO: let _ = fs::remove_file(&file.name);
+
+        let mut path = path.to_vec();
+        path.insert(
+            0,
+            names[&String::from_utf8_lossy(&entry.local.path).to_string()],
+        );
+
+        insert_file.execute(&[&container_id, &pos, &path])?;
+    }
+
+    Ok(())
 }
 
 fn connect() -> Result<postgres::Connection> {
@@ -114,13 +148,13 @@ fn connect() -> Result<postgres::Connection> {
 /// Store the supplied `TempFile` in the appropriate shard in the `shard_root`,
 /// if it is not already present in the database.
 fn maybe_store(
-    store: &mut index::ShardedStore,
+    store: &mut store::ShardedStore,
     file: &TempFile,
     curr: postgres::transaction::Transaction,
-) -> Result<u64> {
+) -> Result<i64> {
     // Postgres doesn't do unsigned.
-    assert!(file.header.len <= std::i64::MAX as u64);
-    let size = file.header.len as i64;
+    assert!(file.len <= std::i64::MAX as u64);
+    let size = file.len as i64;
 
     // Firstly, if it's already there, we're done!
     let (h0, h1, h2, h3) = decompose(file.hash);
@@ -157,14 +191,14 @@ SELECT pg_advisory_unlock(18787)
         return Ok(fetch(&curr, h0, h1, h2, h3, size)?.expect("we just checked it was there..."));
     }
 
-    let pos = store.store(&mut fs::File::open(&file.name)?, file.text, &file.hash)?;
+    let pos = store.store(&file.file, &file.hash)?;
 
     curr.prepare_cached(
         "
 UPDATE blob SET pos=$1 WHERE h0=$2 AND h1=$3 AND h2=$4 AND h3=$5 AND len=$6
 ",
     )?
-        .execute(&[&(pos as i64), &h0, &h1, &h2, &h3, &size])?;
+        .execute(&[&pos, &h0, &h1, &h2, &h3, &size])?;
 
     curr.commit()?;
     Ok(pos)
@@ -177,19 +211,14 @@ fn fetch(
     h2: i64,
     h3: i64,
     len: i64,
-) -> Result<Option<u64>> {
+) -> Result<Option<i64>> {
     let statement = curr.prepare_cached(
         "
 SELECT pos FROM blob WHERE h0=$1 AND h1=$2 AND h2=$3 AND h3=$4 AND len=$5
 ",
     )?;
     let result = statement.query(&[&h0, &h1, &h2, &h3, &len])?;
-    Ok(
-        result
-            .iter()
-            .next()
-            .map(|row| row.get::<usize, i64>(0) as u64),
-    )
+    Ok(result.iter().next().map(|row| row.get::<usize, i64>(0)))
 }
 
 fn decompose(hash: [u8; 256 / 8]) -> (i64, i64, i64, i64) {
@@ -203,7 +232,7 @@ fn decompose(hash: [u8; 256 / 8]) -> (i64, i64, i64, i64) {
 
 fn write_names<'i, I>(conn: &postgres::Connection, wat: I) -> Result<HashMap<String, i64>>
 where
-    I: Iterator<Item = &'i String>,
+    I: Iterator<Item = ::std::borrow::Cow<'i, str>>,
 {
     let write = conn.prepare(
         "
@@ -215,14 +244,16 @@ RETURNING id",
 
     let mut map: HashMap<String, i64> = HashMap::new();
     for path in wat {
+        let path = path.to_string();
         if let hash_map::Entry::Vacant(vacancy) = map.entry(path.to_string()) {
             let id: i64 = match write.query(&[&path])?.iter().next() {
                 Some(row) => row.get(0),
                 None => match read_back.query(&[&path])?.iter().next() {
                     Some(row) => row.get(0),
-                    None => bail!(ErrorKind::InvalidState(
-                        format!("didn't write and didn't find '{}'", path),
-                    )),
+                    None => bail!(ErrorKind::InvalidState(format!(
+                        "didn't write and didn't find '{}'",
+                        path
+                    ),)),
                 },
             };
 
@@ -244,14 +275,11 @@ mod errors {
             }
         }
 
-        links {
-            CatFight(::catfight::Error, ::catfight::ErrorKind);
-            Index(::index::Error, ::index::ErrorKind);
-        }
-
         foreign_links {
             Io(::std::io::Error);
             Pg(::postgres::error::Error);
+            SerdeJson(::serde_json::Error);
+            Splayers(::splayers::Error);
         }
     }
 }
