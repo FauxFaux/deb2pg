@@ -1,6 +1,7 @@
 extern crate byteorder;
 #[macro_use]
 extern crate error_chain;
+extern crate libc;
 #[macro_use]
 extern crate maplit;
 extern crate postgres;
@@ -110,7 +111,7 @@ fn loopy(
             continue;
         }
 
-        let file = match temps::hash_compress_write_from_reader(
+        let mut file = match temps::hash_compress_write_from_reader(
             fs::File::open(entry.local.temp.as_ref().unwrap())?,
             store.locality(),
         )? {
@@ -119,7 +120,7 @@ fn loopy(
         };
         let pos: i64 = match blobs.entry(file.hash) {
             hash_map::Entry::Vacant(storable) => {
-                *storable.insert(maybe_store(store, &file, data_conn.transaction()?)?)
+                *storable.insert(maybe_store(store, file, data_conn.transaction()?)?)
             }
             hash_map::Entry::Occupied(occupied) => *occupied.get(),
         };
@@ -149,7 +150,7 @@ fn connect() -> Result<postgres::Connection> {
 /// if it is not already present in the database.
 fn maybe_store(
     store: &mut store::ShardedStore,
-    file: &TempFile,
+    file: TempFile,
     curr: postgres::transaction::Transaction,
 ) -> Result<i64> {
     // Postgres doesn't do unsigned.
@@ -191,7 +192,7 @@ SELECT pg_advisory_unlock(18787)
         return Ok(fetch(&curr, h0, h1, h2, h3, size)?.expect("we just checked it was there..."));
     }
 
-    let pos = store.store(&file.file, &file.hash)?;
+    let pos = store.store(file.file, &file.hash)?;
 
     curr.prepare_cached(
         "
