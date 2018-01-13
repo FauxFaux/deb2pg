@@ -4,13 +4,11 @@ use std::io::Read;
 use std::io::Seek;
 use std::io::SeekFrom;
 use std::io::Write;
-use std::os::unix::io::AsRawFd;
 use std::path::Path;
 use std::path::PathBuf;
 
-
+use fs2::FileExt;
 use tempfile_fast::PersistableTempFile;
-use libc;
 
 use errors::*;
 
@@ -69,19 +67,9 @@ impl ShardedStore {
         let mut pack_path = self.outdir.to_path_buf();
         pack_path.push(format!("{:02x}.pack", id));
         let mut pack = fs::OpenOptions::new().create(true).append(true).open(pack_path)?;
-        flock(&pack)?;
+        pack.lock_exclusive()?;
         let loc = pack.seek(SeekFrom::End(0))?;
         pack.write_all(&buf)?;
         Ok(loc)
-    }
-}
-
-
-pub fn flock(what: &fs::File) -> Result<()> {
-    let ret = unsafe { libc::flock(what.as_raw_fd(), libc::LOCK_EX) };
-    if 0 != ret {
-        Err(Error::with_chain(io::Error::last_os_error(), "flocking"))
-    } else {
-        Ok(())
     }
 }
