@@ -17,6 +17,15 @@ pub struct ShardedStore {
     loose: u64,
 }
 
+// https://docs.google.com/spreadsheets/d/14LIFzEZt_I0MJeH-gOkMd3iGzkO_2YP4yGF0zoIP19U/edit?usp=sharing
+// How about: 32 byte segments, 256 packs, so covering up to 8kb, then loose files from then on.
+// 8kb covers 95% of non-binary files in my test packages.
+// Saving some of that 256 might help with indexes, but doesn't help much with number of documents:
+//   2^(64 - lg2(256)) = 2^56 = 72 million billion documents.
+// Smaller segments? Don't like the idea of going below 8 bytes? 8kb coverage -> 1024 packs.
+//  2^(64 - lg2(1024)) = 2^54 = still millions of billions.
+// 2^40 (a thousand billion) still sounds like a lot. 2^(64-40) = 16M. We could do byte aligned all
+// the way up to there? Insanity.
 impl ShardedStore {
     pub fn new<P: AsRef<Path>>(outdir: P) -> ShardedStore {
         ShardedStore {
@@ -66,7 +75,10 @@ impl ShardedStore {
         buf.extend(vec![0; eventual_size - len as usize]);
         let mut pack_path = self.outdir.to_path_buf();
         pack_path.push(format!("{:02x}.pack", id));
-        let mut pack = fs::OpenOptions::new().create(true).append(true).open(pack_path)?;
+        let mut pack = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(pack_path)?;
         pack.lock_exclusive()?;
         let loc = pack.seek(SeekFrom::End(0))?;
         pack.write_all(&buf)?;
