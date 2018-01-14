@@ -13,6 +13,13 @@ Corpus
  * 20,138,708 files. 2.7GB with only PKEY.
 
 
+Ingest 2
+--------
+```
+T=/mnt/data/t; rm -rf $T/packs $T/loose; mkdir -p $T/packs $T/loose; (cd $T/loose && mkdir -p $(printf "%03x " {0..4095}))
+
+```
+
 Ingest
 ------
 

@@ -10,6 +10,8 @@ def parse() -> Iterable[Tuple[str, Tuple[str, str]]]:
     root = 'migrations/'
     valid_name = re.compile('(\d{2})-(\w+).sql')
     for path in sorted(os.listdir(root)):
+        if 'migrate.py' == path:
+            continue
         ma = valid_name.match(path)
         if not ma:
             print('invalid file name: "{}"'.format(path))

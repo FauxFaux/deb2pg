@@ -52,13 +52,13 @@ impl ShardedStore {
             self.store_pack(id, len, &mut file)? * SEGMENTS + id
         } else {
             let loose = next_loose()?;
-            let first = loose % 0x100;
-            let second = (loose / 0x100) % 0x100;
+            let first = loose % 0x1000;
             let mut ret = self.outdir.to_path_buf();
-            ret.push(format!("{:02x}", first));
-            ret.push(format!("{:02x}", second));
-            ret.push(format!("{:x}.loose", loose));
-            file.persist_noclobber(ret)?;
+            ret.push("loose");
+            ret.push(format!("{:03x}", first));
+            ret.push(format!("{:x}", loose));
+            file.persist_noclobber(ret)
+                .chain_err(|| "writing loose object")?;
             loose * SEGMENTS
         })
     }
@@ -77,7 +77,8 @@ impl ShardedStore {
         assert_eq!(len, buf.len() as u64);
         buf.extend(vec![0; eventual_size - len as usize]);
         let mut pack_path = self.outdir.to_path_buf();
-        pack_path.push(format!("{:02x}.pack", id));
+        pack_path.push("packs");
+        pack_path.push(format!("{:03x}.pack", id));
         let mut pack = fs::OpenOptions::new()
             .create(true)
             .append(true)

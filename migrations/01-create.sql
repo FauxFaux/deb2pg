@@ -32,3 +32,5 @@ CREATE TABLE container (
   ingested TIMESTAMPTZ NOT NULL DEFAULT now(),
   info     JSONB       NOT NULL
 );
+
+CREATE SEQUENCE loose_blob_seq;
