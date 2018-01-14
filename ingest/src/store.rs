@@ -32,7 +32,6 @@ const SEGMENT_SIZE: u64 = 16;
 const SEGMENTS: u64 = 512;
 // 512 * 16 = 8k.
 
-
 impl ShardedStore {
     pub fn new<P: AsRef<Path>>(outdir: P) -> ShardedStore {
         ShardedStore {
@@ -66,7 +65,6 @@ impl ShardedStore {
     pub fn locality(&self) -> &Path {
         self.outdir.as_path()
     }
-
 
     fn store_pack(&self, id: u64, len: u64, file: &mut PersistableTempFile) -> Result<u64> {
         assert_lt!(id, SEGMENTS);

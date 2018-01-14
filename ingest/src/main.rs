@@ -36,7 +36,7 @@ fn run() -> Result<()> {
     let source = env::args().nth(3).unwrap();
 
     let out_dir = "/mnt/data/t".to_string();
-    let container_info = serde_json::to_string(&hashmap! {
+    let container_info = serde_json::to_value(&hashmap! {
         "type" => "debian",
         "package" => &package_name,
         "version" => &package_version,
@@ -55,10 +55,10 @@ fn run() -> Result<()> {
     let container_id: i64 = meta_tran
         .query(
             "
-INSERT INTO container (info) VALUES (to_jsonb($1::text)) RETURNING id
+INSERT INTO container (info) VALUES ($1) RETURNING id
 "
                 .trim(),
-            &[&container_info.to_string()],
+            &[&container_info],
         )
         .chain_err(|| "inserting container info")?
         .iter()
@@ -169,7 +169,8 @@ fn maybe_store(
     curr.prepare_cached(
         "
 SELECT pg_advisory_lock(18787)
-",
+"
+            .trim(),
     )?
         .execute(&[])?;
 
@@ -178,14 +179,16 @@ SELECT pg_advisory_lock(18787)
 INSERT INTO blob (h0, h1, h2, h3, len)
 SELECT $1, $2, $3, $4, $5
 WHERE NOT EXISTS (SELECT TRUE FROM blob WHERE h0=$1 AND h1=$2 AND h2=$3 AND h3=$4 AND len=$5)
-",
+"
+            .trim(),
     )?
         .execute(&[&h0, &h1, &h2, &h3, &size])?;
 
     curr.prepare_cached(
         "
 SELECT pg_advisory_unlock(18787)
-",
+"
+            .trim(),
     )?
         .execute(&[])?;
 
@@ -206,7 +209,8 @@ SELECT pg_advisory_unlock(18787)
     curr.prepare_cached(
         "
 UPDATE blob SET pos=$1 WHERE h0=$2 AND h1=$3 AND h2=$4 AND h3=$5 AND len=$6
-",
+"
+            .trim(),
     )?
         .execute(&[&pos, &h0, &h1, &h2, &h3, &size])?;
 
@@ -225,7 +229,8 @@ fn fetch(
     let statement = curr.prepare_cached(
         "
 SELECT pos FROM blob WHERE h0=$1 AND h1=$2 AND h2=$3 AND h3=$4 AND len=$5
-",
+"
+            .trim(),
     )?;
     let result = statement.query(&[&h0, &h1, &h2, &h3, &len])?;
     Ok(result.iter().next().map(|row| row.get::<usize, i64>(0)))
@@ -248,7 +253,8 @@ where
         "
 INSERT INTO path_component (path) VALUES ($1)
 ON CONFLICT DO NOTHING
-RETURNING id",
+RETURNING id"
+            .trim(),
     )?;
     let read_back = conn.prepare("SELECT id FROM path_component WHERE path=$1")?;
 
