@@ -1,5 +1,4 @@
 use std::fs;
-use std::io;
 use std::io::Read;
 use std::io::Seek;
 use std::io::SeekFrom;
@@ -14,7 +13,6 @@ use errors::*;
 
 pub struct ShardedStore {
     outdir: PathBuf,
-    loose: u64,
 }
 
 // https://docs.google.com/spreadsheets/d/14LIFzEZt_I0MJeH-gOkMd3iGzkO_2YP4yGF0zoIP19U/edit?usp=sharing
@@ -26,51 +24,46 @@ pub struct ShardedStore {
 //  2^(64 - lg2(1024)) = 2^54 = still millions of billions.
 // 2^40 (a thousand billion) still sounds like a lot. 2^(64-40) = 16M. We could do byte aligned all
 // the way up to there? Insanity.
+// The original reason for a small number of packs was to enable them to all remain open on a system
+// with a small number of allowed open files. Ubuntu seems to default to 1024. This isn't a real
+// restriction, though, as clearly this is a server application now.
 impl ShardedStore {
     pub fn new<P: AsRef<Path>>(outdir: P) -> ShardedStore {
         ShardedStore {
             outdir: outdir.as_ref().to_path_buf(),
-            loose: 0,
         }
     }
 
-    pub fn store(&mut self, mut file: PersistableTempFile, hash: &[u8]) -> Result<i64> {
+    pub fn store<F>(&mut self, mut file: PersistableTempFile, next_loose: F) -> Result<u64>
+    where
+        F: FnOnce() -> Result<u64>,
+    {
         let len = file.seek(SeekFrom::End(0))?;
         Ok(if len < 64 * (255 - 1) {
             let id = len / 64;
             self.store_pack(id, len, &mut file)? * 0x100 + id
         } else {
-            loop {
-                self.loose += 1;
-                match file.persist_noclobber(self.loose_path()) {
-                    Ok(()) => break,
-                    Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => continue,
-                    Err(e) => bail!(e),
-                }
-            }
-            self.loose
-        } as i64)
+            let loose = next_loose()?;
+            let first = loose % 0x100;
+            let second = (loose / 0x100) % 0x100;
+            let mut ret = self.outdir.to_path_buf();
+            ret.push(format!("{:02x}", first));
+            ret.push(format!("{:02x}", second));
+            ret.push(format!("{:x}.loose", loose));
+            file.persist_noclobber(ret)?;
+            loose * 0x100
+        })
     }
 
     pub fn locality(&self) -> &Path {
         self.outdir.as_path()
     }
 
-    fn loose_path(&self) -> PathBuf {
-        let first = self.loose % 0x100;
-        let second = (self.loose / 0x100) % 0x100;
-        let mut ret = self.outdir.to_path_buf();
-        ret.push(format!("{:02x}", first));
-        ret.push(format!("{:02x}", second));
-        ret.push(format!("{:x}.loose", self.loose));
-        ret
-    }
-
     fn store_pack(&self, id: u64, len: u64, file: &mut PersistableTempFile) -> Result<u64> {
         file.seek(SeekFrom::Start(0))?;
         let eventual_size = ((id + 1) * 64) as usize;
         let mut buf = Vec::with_capacity(eventual_size);
-        file.read_to_end(&mut buf);
+        file.read_to_end(&mut buf)?;
         assert_eq!(len, buf.len() as u64);
         buf.extend(vec![0; eventual_size - len as usize]);
         let mut pack_path = self.outdir.to_path_buf();

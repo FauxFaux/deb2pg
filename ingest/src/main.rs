@@ -192,7 +192,14 @@ SELECT pg_advisory_unlock(18787)
         return Ok(fetch(&curr, h0, h1, h2, h3, size)?.expect("we just checked it was there..."));
     }
 
-    let pos = store.store(file.file, &file.hash)?;
+    let pos = store.store(file.file, || {
+        Ok(curr.prepare_cached("select nextval('loose_blob_seq')")?
+            .query(&[])?
+            .iter()
+            .next()
+            .unwrap()
+            .get::<usize, i64>(0) as u64)
+    })? as i64;
 
     curr.prepare_cached(
         "
