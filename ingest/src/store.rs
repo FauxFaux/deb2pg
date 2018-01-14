@@ -29,8 +29,10 @@ pub struct ShardedStore {
 // restriction, though, as clearly this is a server application now.
 
 const SEGMENT_SIZE: u64 = 16;
-const SEGMENTS: u64 = 512;
-// 512 * 16 = 8k.
+const SEGMENTS: u64 = 4096;
+//  512 * 16 = 8k.
+// 1024 * 32 = 32k.
+// 4096 * 16 = 64k.
 
 impl ShardedStore {
     pub fn new<P: AsRef<Path>>(outdir: P) -> ShardedStore {
@@ -76,6 +78,7 @@ impl ShardedStore {
         buf.extend(vec![0; eventual_size - len as usize]);
         let mut pack_path = self.outdir.to_path_buf();
         pack_path.push("packs");
+        pack_path.push(format!("{:x}", id % 0x10));
         pack_path.push(format!("{:03x}.pack", id));
         let mut pack = fs::OpenOptions::new()
             .create(true)

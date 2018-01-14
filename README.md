@@ -16,9 +16,37 @@ Corpus
 Ingest 2
 --------
 ```
-T=/mnt/data/t; rm -rf $T/packs $T/loose; mkdir -p $T/packs $T/loose; (cd $T/loose && mkdir -p $(printf "%03x " {0..4095}))
+T=/mnt/data/t; rm -rf $T/packs $T/loose; mkdir -p $T/packs $T/loose $T/packs/{0..9} $T/packs/{a..f}; (cd $T/loose && mkdir -p $(printf "%03x " {0..4095}))
 
 ```
+
+Zstd / sizes
+------------
+
+50 random source packages, happened to include `llvm-toolchain`,
+`thunderbird` and `php7`. https://b.goeswhere.com/source-text.tar.lzma
+
+Took all text files from the `apt-get source` result (i.e. not fully unpacked,
+patched, debian/ folder present), and worked out some statistics on them.
+Given around 30,000 packages, 50 is not a great sample, so multiplying these
+numbers by 600 is not ideal. Relative sizes of source files should be representative,
+though.
+
+ * zstd dictionaries, trained on files 1-99, 100-999, and 1,000-9,999 bytes.
+ * Sizes after default zstd compression. Of 256507 files:
+   * max: 2,000kb
+   * 0.01%  (25) are >320kb
+   * 0.02%  (51) are >250kb
+   * 0.05% (128) are > 99kb
+   * 0.11% (282) are > 64kb.
+   * 0.33% (864) are > 32kb.
+   * min: 13 bytes.
+
+1/0.33% = 300.
+1/0.11% = 900.
+
+13-byte minimum comes from checksum (4 bytes) (`--no-check`), and a 4-byte magic number,
+so ~6 bytes for a single-byte input. Not a super interesting case.
 
 Ingest
 ------
