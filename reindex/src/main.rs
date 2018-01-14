@@ -213,7 +213,7 @@ fn main() {
             out.write_u32::<LittleEndian>(*tri).unwrap();
 
             let poses = &tri_poses[tri];
-            assert!(poses.len() <= std::u32::MAX as usize);
+            assert_le!(poses.len(), std::u32::MAX as usize);
             out.write_u32::<LittleEndian>(poses.len() as u32).unwrap();
         }
 

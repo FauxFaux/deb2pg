@@ -25,7 +25,7 @@ pub fn magic_offset_only(len: u64, text: bool) -> u8 {
 }
 
 pub fn name_for_magic(magic: u8) -> String {
-    assert!(magic < 16);
+    assert_lt!(magic, 16);
     format!(
         "{}-{}",
         text_otherwise_bin(magic >= SHARD_NO_TEXT_OFFSET),
@@ -77,7 +77,8 @@ pub fn addendum_from_path(path: &str) -> (u8, u64) {
 
     let mut it = path.chars().skip(if text { 5 } else { 4 });
     let size_raw = it.next().expect("num") as u8 - '2' as u8;
-    assert!(size_raw >= 2 - 2 && size_raw <= 9 - 2);
+    assert_ge!(size_raw, 2 - 2);
+    assert_le!(size_raw, 9 - 2);
     assert_eq!('.', it.next().unwrap());
 
     (

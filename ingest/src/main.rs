@@ -4,6 +4,8 @@ extern crate error_chain;
 extern crate fs2;
 #[macro_use]
 extern crate maplit;
+#[macro_use]
+extern crate more_asserts;
 extern crate postgres;
 extern crate serde_json;
 extern crate sha2;
@@ -154,7 +156,7 @@ fn maybe_store(
     curr: postgres::transaction::Transaction,
 ) -> Result<i64> {
     // Postgres doesn't do unsigned.
-    assert!(file.len <= std::i64::MAX as u64);
+    assert_le!(file.len, std::i64::MAX as u64);
     let size = file.len as i64;
 
     // Firstly, if it's already there, we're done!
@@ -193,7 +195,7 @@ SELECT pg_advisory_unlock(18787)
     }
 
     let pos = store.store(file.file, || {
-        Ok(curr.prepare_cached("select nextval('loose_blob_seq')")?
+        Ok(curr.prepare_cached("SELECT nextval('loose_blob_seq')")?
             .query(&[])?
             .iter()
             .next()
@@ -265,7 +267,7 @@ RETURNING id",
                 },
             };
 
-            assert!(id >= 0);
+            assert_ge!(id, 0);
             vacancy.insert(id);
         }
     }

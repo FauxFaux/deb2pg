@@ -27,6 +27,12 @@ pub struct ShardedStore {
 // The original reason for a small number of packs was to enable them to all remain open on a system
 // with a small number of allowed open files. Ubuntu seems to default to 1024. This isn't a real
 // restriction, though, as clearly this is a server application now.
+
+const SEGMENT_SIZE: u64 = 16;
+const SEGMENTS: u64 = 512;
+// 512 * 16 = 8k.
+
+
 impl ShardedStore {
     pub fn new<P: AsRef<Path>>(outdir: P) -> ShardedStore {
         ShardedStore {
@@ -39,9 +45,11 @@ impl ShardedStore {
         F: FnOnce() -> Result<u64>,
     {
         let len = file.seek(SeekFrom::End(0))?;
-        Ok(if len < 64 * (255 - 1) {
-            let id = len / 64;
-            self.store_pack(id, len, &mut file)? * 0x100 + id
+        assert_ne!(0, len);
+        let id = ((len - 1) / SEGMENT_SIZE) + 1;
+        // segments: 4, 0: loose, 1, 2, 3: packed. 3 < 4.
+        Ok(if id < SEGMENTS {
+            self.store_pack(id, len, &mut file)? * SEGMENTS + id
         } else {
             let loose = next_loose()?;
             let first = loose % 0x100;
@@ -51,7 +59,7 @@ impl ShardedStore {
             ret.push(format!("{:02x}", second));
             ret.push(format!("{:x}.loose", loose));
             file.persist_noclobber(ret)?;
-            loose * 0x100
+            loose * SEGMENTS
         })
     }
 
@@ -59,9 +67,11 @@ impl ShardedStore {
         self.outdir.as_path()
     }
 
+
     fn store_pack(&self, id: u64, len: u64, file: &mut PersistableTempFile) -> Result<u64> {
+        assert_lt!(id, SEGMENTS);
         file.seek(SeekFrom::Start(0))?;
-        let eventual_size = ((id + 1) * 64) as usize;
+        let eventual_size = (id * SEGMENT_SIZE) as usize;
         let mut buf = Vec::with_capacity(eventual_size);
         file.read_to_end(&mut buf)?;
         assert_eq!(len, buf.len() as u64);

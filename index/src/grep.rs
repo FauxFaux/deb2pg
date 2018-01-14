@@ -27,7 +27,7 @@ fn reader_contains_external_buf<R: Read>(
 
     let mut total_read = 0u64;
 
-    assert!(needle.len() < buf.len());
+    assert_lt!(needle.len(), buf.len());
 
     let mut fill = 0;
 
