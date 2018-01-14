@@ -1,4 +1,6 @@
 use std::io::Read;
+use std::io::Seek;
+use std::io::SeekFrom;
 use std::io::Write;
 use std::path::Path;
 
@@ -9,6 +11,14 @@ use sha2::Sha512Trunc256;
 use zstd;
 
 use errors::*;
+
+const DICT_LEN: usize = 112640;
+type Dict = &'static [u8; DICT_LEN];
+const DICT: [Dict; 3] = [
+    include_bytes!("../../99.dictionary"),
+    include_bytes!("../../999.dictionary"),
+    include_bytes!("../../9999.dictionary"),
+];
 
 pub struct TempFile {
     pub len: u64,
@@ -33,16 +43,29 @@ fn is_text(buf: &[u8]) -> bool {
     true
 }
 
-pub fn hash_compress_write_from_reader<R: Read, P: AsRef<Path>>(
+fn dict_for(len: u64) -> Dict {
+    if len < 100 {
+        DICT[0]
+    } else if len < 1000 {
+        DICT[1]
+    } else {
+        DICT[2]
+    }
+}
+
+pub fn hash_compress_write_from_reader<R: Read + Seek, P: AsRef<Path>>(
     mut from: R,
     inside: P,
 ) -> Result<Option<TempFile>> {
+    let len = from.seek(SeekFrom::End(0))?;
+    from.seek(SeekFrom::Start(0))?;
+
     let mut to = persistable_tempfile_in(inside)?;
     let mut hasher = Sha512Trunc256::default();
     let mut total_read = 0u64;
 
     {
-        let mut compressor = zstd::Encoder::new(to.as_mut(), 0)?;
+        let mut compressor = zstd::Encoder::with_dictionary(to.as_mut(), 10, dict_for(len))?;
 
         loop {
             let mut buf = [0u8; 1024 * 8];

@@ -34,6 +34,8 @@ const SEGMENTS: u64 = 4096;
 // 1024 * 32 = 32k.
 // 4096 * 16 = 64k.
 
+const MAGIC_LEN: u64 = 4;
+
 impl ShardedStore {
     pub fn new<P: AsRef<Path>>(outdir: P) -> ShardedStore {
         ShardedStore {
@@ -45,8 +47,8 @@ impl ShardedStore {
     where
         F: FnOnce() -> Result<u64>,
     {
-        let len = file.seek(SeekFrom::End(0))?;
-        assert_ne!(0, len);
+        let len = file.seek(SeekFrom::End(0))? - MAGIC_LEN;
+        assert_gt!(len, 2);
         let id = ((len - 1) / SEGMENT_SIZE) + 1;
         // segments: 4, 0: loose, 1, 2, 3: packed. 3 < 4.
         Ok(if id < SEGMENTS {
@@ -74,7 +76,7 @@ impl ShardedStore {
         let eventual_size = (id * SEGMENT_SIZE) as usize;
         let mut buf = Vec::with_capacity(eventual_size);
         file.read_to_end(&mut buf)?;
-        assert_eq!(len, buf.len() as u64);
+        assert_eq!(len + MAGIC_LEN, buf.len() as u64);
         buf.extend(vec![0; eventual_size - len as usize]);
         let mut pack_path = self.outdir.to_path_buf();
         pack_path.push("packs");
@@ -86,7 +88,7 @@ impl ShardedStore {
             .open(pack_path)?;
         pack.lock_exclusive()?;
         let loc = pack.seek(SeekFrom::End(0))?;
-        pack.write_all(&buf)?;
+        pack.write_all(&buf[MAGIC_LEN as usize..])?;
         Ok(loc)
     }
 }

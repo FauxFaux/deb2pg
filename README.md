@@ -48,6 +48,10 @@ though.
 13-byte minimum comes from checksum (4 bytes) (`--no-check`), and a 4-byte magic number,
 so ~6 bytes for a single-byte input. Not a super interesting case.
 
+Next two bytes are a flag byte, and a memory hint. Neither of which are relevant to us,
+I don't think. Maybe. Maybe we should try it, or see what the API can actually do for me.
+https://github.com/facebook/zstd/blob/dev/doc/zstd_compression_format.md#frame_header
+
 Ingest
 ------
 
