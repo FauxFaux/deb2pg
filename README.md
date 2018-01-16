@@ -132,3 +132,18 @@ Hopefully some of these are timeouts. zip might be zip64, which we don't seem
  * vboot-utils/vboot-utils_0~R52-8350.B-2.dsc
 
 ... + [e2fsprogs](https://github.com/FauxFaux/ext4-rs/issues/1).
+
+Gathering
+---------
+
+```
+apt list | sort -R | head -n 1000 | while read x; do apt source $(echo $x | cut -d/ -f 1); done
+find *(/) -type f | ~/code/deb3pg/extensions.py | sort | uniq -c | sort -n
+# group and sed
+mkdir -p sets/foo
+cd !$
+i=0; find ../../src -type f -size -10k \(
+[...]
+ \) | sort -R | head -n 5000 | while read x; do cp -ar --reflink=auto "$x" $i; i=$((i+1)); done
+zstd --dictID=15 -T8 --train-cover=steps=400 *
+```

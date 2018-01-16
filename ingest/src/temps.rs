@@ -14,11 +14,29 @@ use errors::*;
 
 const DICT_LEN: usize = 112640;
 type Dict = &'static [u8; DICT_LEN];
-const DICT: [Dict; 3] = [
-    include_bytes!("../../99.dictionary"),
-    include_bytes!("../../999.dictionary"),
-    include_bytes!("../../9999.dictionary"),
+const DICT: [Dict; 8] = [
+    include_bytes!("../../dicts/text.dictionary"), // 11
+    include_bytes!("../../dicts/conf.dictionary"), // 12
+    include_bytes!("../../dicts/c.dictionary"), // 13
+    include_bytes!("../../dicts/oddlang.dictionary"), // 14
+    include_bytes!("../../dicts/web.dictionary"), // 15
+
+    include_bytes!("../../dicts/99.dictionary"), // 2
+    include_bytes!("../../dicts/999.dictionary"), // 3
+    include_bytes!("../../dicts/9999.dictionary"), // 4
 ];
+
+enum CompressionType {
+    Text,
+    Conf,
+    C,
+    Code,
+    Web,
+
+    Tiny,
+    Medium,
+    Other,
+}
 
 pub struct TempFile {
     pub len: u64,
@@ -98,4 +116,93 @@ fn to_bytes(slice: &[u8]) -> [u8; 256 / 8] {
     let mut hash = [0u8; 256 / 8];
     hash.clone_from_slice(slice);
     hash
+}
+
+
+fn identify(path: &str) -> CompressionType {
+    let text = [
+        "control",
+        "dsc",
+        "doc",
+        "rst",
+        "txt",
+        "po",
+        "README",
+        "LICENSE",
+        "copyright",
+        "md",
+        "mo",
+        "rdf",
+        "qdoc",
+        "manifest",
+    ];
+
+    let conf = [
+        "Makefile",
+        "properties",
+        "ini",
+        "in",
+        "inc",
+        "json",
+        "am",
+        "build",
+        "gitignore",
+        "sh",
+        "m4",
+        "mk",
+        "pro",
+        "rules",
+        "cmake",
+        "cfg",
+        "conf",
+        "gyp",
+        "yaml",
+        "qml",
+    ];
+
+    let c = [
+        "hxx",
+        "cpp",
+        "c",
+        "h",
+        "hpp",
+        "cc",
+        "cxx",
+        "d",
+        "ml",
+        "hh",
+        "idl",
+    ];
+
+    let odd = [
+        "cs",
+        "java",
+        "rb",
+        "rs",
+        "py",
+        "go",
+        "php",
+        "phpt",
+        "hs",
+        "ll",
+        "s",
+        "pl",
+        "pm",
+    ];
+
+    let web = [
+        "xhtml",
+        "dtd",
+        "html",
+        "js",
+        "xml",
+        "svg",
+        "xht",
+        "xul",
+        "css",
+        "htm",
+        "sjs",
+    ];
+
+    unimplemented!()
 }
