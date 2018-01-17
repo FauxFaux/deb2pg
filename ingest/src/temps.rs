@@ -14,17 +14,17 @@ use errors::*;
 
 const DICT_LEN: usize = 112640;
 type Dict = &'static [u8; DICT_LEN];
-const DICT: [Dict; 8] = [
-    include_bytes!("../../dicts/text.dictionary"),    // 11
-    include_bytes!("../../dicts/conf.dictionary"),    // 12
-    include_bytes!("../../dicts/c.dictionary"),       // 13
-    include_bytes!("../../dicts/oddlang.dictionary"), // 14
-    include_bytes!("../../dicts/web.dictionary"),     // 15
-    include_bytes!("../../dicts/99.dictionary"),      // 2
-    include_bytes!("../../dicts/999.dictionary"),     // 3
-    include_bytes!("../../dicts/9999.dictionary"),    // 4
-];
 
+const DICT_11_TEXT: Dict = include_bytes!("../../dicts/text.dictionary");
+const DICT_12_CONF: Dict =     include_bytes!("../../dicts/conf.dictionary");
+const DICT_13_C: Dict = include_bytes!("../../dicts/c.dictionary");
+const DICT_14_CODE: Dict = include_bytes!("../../dicts/oddlang.dictionary");
+const DICT_15_WEB: Dict = include_bytes!("../../dicts/web.dictionary");
+const DICT_2_99: Dict = include_bytes!("../../dicts/99.dictionary");
+const DICT_3_999: Dict = include_bytes!("../../dicts/999.dictionary");
+const DICT_4_9999: Dict = include_bytes!("../../dicts/9999.dictionary");
+
+#[derive(Copy, Clone, PartialEq, Eq)]
 enum CompressionType {
     Text,
     Conf,
@@ -60,18 +60,22 @@ fn is_text(buf: &[u8]) -> bool {
     true
 }
 
-fn dict_for(len: u64) -> Dict {
-    if len < 100 {
-        DICT[0]
-    } else if len < 1000 {
-        DICT[1]
-    } else {
-        DICT[2]
+fn dict_for(format: CompressionType) -> Dict {
+    match format {
+        CompressionType::Text => DICT_11_TEXT,
+        CompressionType::Conf => DICT_12_CONF,
+        CompressionType::C => DICT_13_C,
+        CompressionType::Code => DICT_14_CODE,
+        CompressionType::Web => DICT_15_WEB,
+        CompressionType::Tiny => DICT_2_99,
+        CompressionType::Medium => DICT_3_999,
+        CompressionType::Other => DICT_4_9999,
     }
 }
 
 pub fn hash_compress_write_from_reader<R: Read + Seek, P: AsRef<Path>>(
     mut from: R,
+    path_hint: &str,
     inside: P,
 ) -> Result<Option<TempFile>> {
     let len = from.seek(SeekFrom::End(0))?;
@@ -82,7 +86,15 @@ pub fn hash_compress_write_from_reader<R: Read + Seek, P: AsRef<Path>>(
     let mut total_read = 0u64;
 
     {
-        let mut compressor = zstd::Encoder::with_dictionary(to.as_mut(), 10, dict_for(len))?;
+        let compression_type = match identify(path_hint) {
+            CompressionType::Other => match len {
+                0...99 => CompressionType::Tiny,
+                100...999 => CompressionType::Medium,
+                _ => CompressionType::Other,
+            }
+            other => other,
+        };
+        let mut compressor = zstd::Encoder::with_dictionary(to.as_mut(), 10, dict_for(compression_type))?;
 
         loop {
             let mut buf = [0u8; 1024 * 8];

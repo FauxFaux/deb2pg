@@ -115,6 +115,7 @@ fn loopy(
 
         let mut file = match temps::hash_compress_write_from_reader(
             fs::File::open(entry.local.temp.as_ref().unwrap())?,
+            &String::from_utf8_lossy(&entry.local.path),
             store.locality(),
         )? {
             Some(x) => x,
