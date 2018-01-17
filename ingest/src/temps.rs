@@ -15,15 +15,14 @@ use errors::*;
 const DICT_LEN: usize = 112640;
 type Dict = &'static [u8; DICT_LEN];
 const DICT: [Dict; 8] = [
-    include_bytes!("../../dicts/text.dictionary"), // 11
-    include_bytes!("../../dicts/conf.dictionary"), // 12
-    include_bytes!("../../dicts/c.dictionary"), // 13
+    include_bytes!("../../dicts/text.dictionary"),    // 11
+    include_bytes!("../../dicts/conf.dictionary"),    // 12
+    include_bytes!("../../dicts/c.dictionary"),       // 13
     include_bytes!("../../dicts/oddlang.dictionary"), // 14
-    include_bytes!("../../dicts/web.dictionary"), // 15
-
-    include_bytes!("../../dicts/99.dictionary"), // 2
-    include_bytes!("../../dicts/999.dictionary"), // 3
-    include_bytes!("../../dicts/9999.dictionary"), // 4
+    include_bytes!("../../dicts/web.dictionary"),     // 15
+    include_bytes!("../../dicts/99.dictionary"),      // 2
+    include_bytes!("../../dicts/999.dictionary"),     // 3
+    include_bytes!("../../dicts/9999.dictionary"),    // 4
 ];
 
 enum CompressionType {
@@ -118,91 +117,106 @@ fn to_bytes(slice: &[u8]) -> [u8; 256 / 8] {
     hash
 }
 
-
 fn identify(path: &str) -> CompressionType {
-    let text = [
-        "control",
-        "dsc",
-        "doc",
-        "rst",
-        "txt",
-        "po",
-        "README",
-        "LICENSE",
-        "copyright",
-        "md",
-        "mo",
-        "rdf",
-        "qdoc",
-        "manifest",
-    ];
+    let filename: String = path.split('/').last().unwrap_or(path).to_ascii_lowercase();
+    let ext = &filename[filename.rfind('.').unwrap_or(0)..];
+    use self::CompressionType::*;
 
-    let conf = [
-        "Makefile",
-        "properties",
-        "ini",
-        "in",
-        "inc",
-        "json",
-        "am",
-        "build",
-        "gitignore",
-        "sh",
-        "m4",
-        "mk",
-        "pro",
-        "rules",
-        "cmake",
-        "cfg",
-        "conf",
-        "gyp",
-        "yaml",
-        "qml",
-    ];
+    match ext {
+        "txt" => Text,
+        "rst" => Text,
+        "md" => Text,
+        "doc" => Text,
 
-    let c = [
-        "hxx",
-        "cpp",
-        "c",
-        "h",
-        "hpp",
-        "cc",
-        "cxx",
-        "d",
-        "ml",
-        "hh",
-        "idl",
-    ];
+        "control" => Text,
+        "dsc" => Text,
+        "readme" => Text,
+        "license" => Text,
+        "licence" => Text,
+        "copyright" => Text,
 
-    let odd = [
-        "cs",
-        "java",
-        "rb",
-        "rs",
-        "py",
-        "go",
-        "php",
-        "phpt",
-        "hs",
-        "ll",
-        "s",
-        "pl",
-        "pm",
-    ];
+        "po" => Text,
+        "mo" => Text,
 
-    let web = [
-        "xhtml",
-        "dtd",
-        "html",
-        "js",
-        "xml",
-        "svg",
-        "xht",
-        "xul",
-        "css",
-        "htm",
-        "sjs",
-    ];
+        "rdf" => Text,
+        "qdoc" => Text,
+        "manifest" => Text,
 
-    unimplemented!()
+        "makefile" => Conf,
+        "in" => Conf,
+        "m4" => Conf,
+        "mk" => Conf,
+        "pro" => Conf,
+        "rules" => Conf,
+        "inc" => Conf,
+        "am" => Conf,
+        "build" => Conf,
+        "cmake" => Conf,
+        "gyp" => Conf,
+
+        "gitignore" => Conf,
+
+        "properties" => Conf,
+        "ini" => Conf,
+        "json" => Conf,
+        "cfg" => Conf,
+        "conf" => Conf,
+        "yaml" => Conf,
+        "qml" => Conf,
+
+        "sh" => Conf,
+
+        "c" => C,
+        "cpp" => C,
+        "cc" => C,
+        "cxx" => C,
+        "h" => C,
+        "hpp" => C,
+        "hxx" => C,
+
+        "d" => C,
+        "ml" => C,
+        "hh" => C,
+        "idl" => C,
+
+        "cs" => Code,
+        "go" => Code,
+        "hs" => Code,
+        "java" => Code,
+        "ll" => Code,
+        "php" => Code,
+        "phpt" => Code,
+        "pl" => Code,
+        "pm" => Code,
+        "py" => Code,
+        "rb" => Code,
+        "rs" => Code,
+        "s" => Code,
+
+        "htm" => Web,
+        "html" => Web,
+        "xhtml" => Web,
+
+        "js" => Web,
+        "sjs" => Web,
+
+        "dtd" => Web,
+        "xml" => Web,
+        "svg" => Web,
+
+        "xht" => Web,
+        "xul" => Web,
+
+        "css" => Web,
+
+        _ => {
+            if filename.contains("readme") || filename.contains("license")
+                || filename.contains("licence")
+            {
+                Text
+            } else {
+                Other
+            }
+        }
+    }
 }
