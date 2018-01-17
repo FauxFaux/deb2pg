@@ -22,6 +22,7 @@ use std::collections::HashMap;
 
 use byteorder::{ByteOrder, LittleEndian};
 
+mod dicts;
 mod temps;
 mod store;
 
