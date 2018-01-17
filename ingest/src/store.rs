@@ -6,7 +6,6 @@ use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 
-use fs2::FileExt;
 use tempfile_fast::PersistableTempFile;
 
 use errors::*;
@@ -86,9 +85,9 @@ impl ShardedStore {
             .create(true)
             .append(true)
             .open(pack_path)?;
-        pack.lock_exclusive()?;
-        let loc = pack.seek(SeekFrom::End(0))?;
-        pack.write_all(&buf[MAGIC_LEN as usize..])?;
-        Ok(loc)
+        ensure!(pack.seek(SeekFrom::End(0))? % (eventual_size as u64) == 0, "file is improper");
+        let to_write = &buf[MAGIC_LEN as usize..];
+        ensure!(to_write.len() == pack.write(to_write)?, "atomic write failed, uh oh");
+        Ok(pack.seek(SeekFrom::Current(0))?)
     }
 }

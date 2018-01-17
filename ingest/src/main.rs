@@ -1,7 +1,6 @@
 extern crate byteorder;
 #[macro_use]
 extern crate error_chain;
-extern crate fs2;
 #[macro_use]
 extern crate maplit;
 #[macro_use]
