@@ -18,5 +18,8 @@ zstd = "0.4"
 version = "0.15"
 features = ["with-serde_json"]
 
+[dependencies.fapt-pkg]
+path = "../../fapt/fapt-pkg"
+
 [dependencies.splayers]
 path = "../../splayers"

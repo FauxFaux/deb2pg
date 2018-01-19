@@ -1,6 +1,7 @@
 extern crate byteorder;
 #[macro_use]
 extern crate error_chain;
+extern crate fapt_pkg;
 #[macro_use]
 extern crate maplit;
 #[macro_use]
@@ -28,7 +29,61 @@ mod store;
 use errors::*;
 use temps::TempFile;
 
+#[derive(Debug, Clone)]
+struct Package {
+    pkg: String,
+    version: String,
+    dir: String,
+    dsc: String,
+    size: u64,
+    prefix: String,
+}
+
+fn packages() -> Result<Vec<Package>> {
+    let mut fapt = fapt_pkg::System::cache_dirs_only("lists")?;
+    fapt.add_sources_entry_line("deb-src http://deb.debian.org/debian sid main contrib non-free")
+        .expect("parsing static data");
+    fapt.add_keyring_paths(&["/usr/share/keyrings/debian-archive-keyring.gpg"])?;
+    fapt.update()?;
+    let mut ret = Vec::new();
+    for section in fapt.sections()? {
+        let section = section?;
+        let map = fapt_pkg::rfc822_into_map(&section)?;
+        let pkg = one_line(&map["Package"])?;
+        let version = one_line(&map["Version"])?;
+        ret.push(Package {
+            prefix: format!("{}/{}_{}", subdir(&pkg), pkg, version),
+
+            pkg,
+            version,
+            dir: one_line(&map["Directory"])?,
+
+            dsc: map["Files"]
+                .iter()
+                .filter(|line| line.ends_with(".dsc"))
+                .next()
+                .unwrap()
+                .split_whitespace()
+                .nth(2)
+                .unwrap()
+                .to_string(),
+
+            size: map["Files"]
+                .iter()
+                .map(|line| {
+                    let num: &str = line.split_whitespace().nth(1).unwrap();
+                    let num: u64 = num.parse().unwrap();
+                    num
+                })
+                .sum(),
+        })
+    }
+    Ok(ret)
+}
+
 fn run() -> Result<()> {
+    println!("{:?}", packages()?);
+
     assert_eq!(4, env::args().len());
 
     let package_name = env::args().nth(1).unwrap();
@@ -281,6 +336,20 @@ RETURNING id"
     Ok(map)
 }
 
+fn one_line(lines: &[&str]) -> Result<String> {
+    ensure!(1 == lines.len(), "{:?} isn't exactly one line", lines);
+    Ok(lines[0].to_string())
+}
+
+// Sigh, I've already written this.
+fn subdir(name: &str) -> &str {
+    if name.starts_with("lib") {
+        &name[..4]
+    } else {
+        &name[..1]
+    }
+}
+
 quick_main!(run);
 
 mod errors {
@@ -290,6 +359,10 @@ mod errors {
                 description("assert!")
                 display("invalid state: {}", msg)
             }
+        }
+
+        links {
+            FaptPkg(::fapt_pkg::Error, ::fapt_pkg::ErrorKind);
         }
 
         foreign_links {

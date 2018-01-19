@@ -85,9 +85,15 @@ impl ShardedStore {
             .create(true)
             .append(true)
             .open(pack_path)?;
-        ensure!(pack.seek(SeekFrom::End(0))? % (eventual_size as u64) == 0, "file is improper");
+        ensure!(
+            pack.seek(SeekFrom::End(0))? % (eventual_size as u64) == 0,
+            "file is improper"
+        );
         let to_write = &buf[MAGIC_LEN as usize..];
-        ensure!(to_write.len() == pack.write(to_write)?, "atomic write failed, uh oh");
+        ensure!(
+            to_write.len() == pack.write(to_write)?,
+            "atomic write failed, uh oh"
+        );
         Ok(pack.seek(SeekFrom::Current(0))?)
     }
 }
