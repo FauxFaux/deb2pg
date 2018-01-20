@@ -26,6 +26,7 @@ use std::process;
 use byteorder::{ByteOrder, LittleEndian};
 
 mod dicts;
+mod errors;
 mod temps;
 mod store;
 
@@ -387,25 +388,3 @@ fn subdir(name: &str) -> &str {
 }
 
 quick_main!(run);
-
-mod errors {
-    error_chain! {
-        errors {
-            InvalidState(msg: String) {
-                description("assert!")
-                display("invalid state: {}", msg)
-            }
-        }
-
-        links {
-            FaptPkg(::fapt_pkg::Error, ::fapt_pkg::ErrorKind);
-        }
-
-        foreign_links {
-            Io(::std::io::Error);
-            Pg(::postgres::error::Error);
-            SerdeJson(::serde_json::Error);
-            Splayers(::splayers::Error);
-        }
-    }
-}
