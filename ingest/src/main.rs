@@ -10,15 +10,18 @@ extern crate postgres;
 extern crate serde_json;
 extern crate sha2;
 extern crate splayers;
+extern crate tempdir;
 extern crate tempfile;
 extern crate tempfile_fast;
 extern crate zstd;
 
-use std::env;
 use std::fs;
 
 use std::collections::hash_map;
 use std::collections::HashMap;
+
+use std::path::Path;
+use std::process;
 
 use byteorder::{ByteOrder, LittleEndian};
 
@@ -39,12 +42,7 @@ struct Package {
     prefix: String,
 }
 
-fn packages() -> Result<Vec<Package>> {
-    let mut fapt = fapt_pkg::System::cache_dirs_only("lists")?;
-    fapt.add_sources_entry_line("deb-src http://deb.debian.org/debian sid main contrib non-free")
-        .expect("parsing static data");
-    fapt.add_keyring_paths(&["/usr/share/keyrings/debian-archive-keyring.gpg"])?;
-    fapt.update()?;
+fn packages(fapt: &fapt_pkg::System) -> Result<Vec<Package>> {
     let mut ret = Vec::new();
     fapt.walk_sections(|map| {
         let pkg = map.get_if_one_line("Package").ok_or("invalid Package")?;
@@ -83,20 +81,62 @@ fn packages() -> Result<Vec<Package>> {
 }
 
 fn run() -> Result<()> {
-    println!("{:?}", packages()?);
+    let mirror = "http://urika:3142/debian";
 
-    assert_eq!(4, env::args().len());
+    let mut fapt = fapt_pkg::System::cache_dirs_only("lists")?;
+    fapt.add_sources_entry_line(&format!("deb-src {} sid main contrib non-free", mirror))?;
+    fapt.add_keyring_paths(&["/usr/share/keyrings/debian-archive-keyring.gpg"])?;
+    fapt.update()?;
 
-    let package_name = env::args().nth(1).unwrap();
-    let package_version = env::args().nth(2).unwrap();
-    let source = env::args().nth(3).unwrap();
+    let exists_conn = connect()?;
+    let exists_tran = exists_conn.transaction()?;
+    let exists_stat = exists_tran.prepare("SELECT EXISTS(SELECT 1 FROM container WHERE info=$1)")?;
 
+    for package in packages(&fapt)? {
+        let container_info = serde_json::to_value(&hashmap! {
+            "type" => "debian",
+            "package" => &package.pkg,
+            "version" => &package.version,
+        })?;
+
+        if exists_stat.query(&[&container_info])?.get(0).get(0) {
+            continue;
+        }
+
+        let tmp = tempdir::TempDir::new(&format!(".unpack-{}", package.pkg))?;
+        let url = format!("{}/{}/{}", mirror, package.dir, package.dsc);
+
+        assert!(
+            process::Command::new("dget")
+                .arg("--download-only")
+                .arg(url)
+                .current_dir(&tmp)
+                .status()?
+                .success(),
+            "dget failed"
+        );
+
+        assert!(
+            process::Command::new("dpkg-source")
+                .arg("--extract")
+                .arg(package.dsc)
+                .arg("t")
+                .current_dir(&tmp)
+                .status()?
+                .success(),
+            "dpkg-source failed"
+        );
+
+        let mut path = tmp.path().to_path_buf();
+        path.push("t");
+        ingest(&container_info, &path)?;
+    }
+
+    Ok(())
+}
+
+fn ingest<P: AsRef<Path>>(container_info: &serde_json::Value, source: P) -> Result<()> {
     let out_dir = "/mnt/data/t".to_string();
-    let container_info = serde_json::to_value(&hashmap! {
-        "type" => "debian",
-        "package" => &package_name,
-        "version" => &package_version,
-    })?;
 
     // Weird lifetime alarm: paths become invalid when this is dropped.
     let temp_files = splayers::Unpack::unpack_into(source, &out_dir)?;
