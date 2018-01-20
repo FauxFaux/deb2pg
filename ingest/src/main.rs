@@ -46,19 +46,19 @@ fn packages() -> Result<Vec<Package>> {
     fapt.add_keyring_paths(&["/usr/share/keyrings/debian-archive-keyring.gpg"])?;
     fapt.update()?;
     let mut ret = Vec::new();
-    for section in fapt.sections()? {
-        let section = section?;
-        let map = fapt_pkg::rfc822_into_map(&section)?;
-        let pkg = one_line(&map["Package"])?;
-        let version = one_line(&map["Version"])?;
+    fapt.walk_sections(|map| {
+        let pkg = map.get_if_one_line("Package").ok_or("invalid Package")?;
+        let version = map.get_if_one_line("Version").ok_or("invalid Version")?;
         ret.push(Package {
             prefix: format!("{}/{}_{}", subdir(&pkg), pkg, version),
 
-            pkg,
-            version,
-            dir: one_line(&map["Directory"])?,
+            pkg: pkg.to_string(),
+            version: version.to_string(),
+            dir: map.get_if_one_line("Directory")
+                .ok_or("invalid Directory")?
+                .to_string(),
 
-            dsc: map["Files"]
+            dsc: map.as_ref()["Files"]
                 .iter()
                 .filter(|line| line.ends_with(".dsc"))
                 .next()
@@ -68,7 +68,7 @@ fn packages() -> Result<Vec<Package>> {
                 .unwrap()
                 .to_string(),
 
-            size: map["Files"]
+            size: map.as_ref()["Files"]
                 .iter()
                 .map(|line| {
                     let num: &str = line.split_whitespace().nth(1).unwrap();
@@ -76,8 +76,9 @@ fn packages() -> Result<Vec<Package>> {
                     num
                 })
                 .sum(),
-        })
-    }
+        });
+        Ok(())
+    })?;
     Ok(ret)
 }
 
@@ -334,11 +335,6 @@ RETURNING id"
         }
     }
     Ok(map)
-}
-
-fn one_line(lines: &[&str]) -> Result<String> {
-    ensure!(1 == lines.len(), "{:?} isn't exactly one line", lines);
-    Ok(lines[0].to_string())
 }
 
 // Sigh, I've already written this.
