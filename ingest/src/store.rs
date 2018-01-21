@@ -87,7 +87,8 @@ impl ShardedStore {
             .open(pack_path)?;
         ensure!(
             pack.seek(SeekFrom::End(0))? % (eventual_size as u64) == 0,
-            "file is improper"
+            "file is improper: {:?}",
+            pack_path
         );
         let to_write = &buf[MAGIC_LEN as usize..];
         ensure!(
