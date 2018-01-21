@@ -25,6 +25,7 @@ use std::process;
 
 use byteorder::{ByteOrder, LittleEndian};
 
+mod deb;
 mod dicts;
 mod errors;
 mod temps;
@@ -34,7 +35,7 @@ use errors::*;
 use temps::TempFile;
 
 #[derive(Debug, Clone)]
-struct Package {
+pub struct Package {
     pkg: String,
     version: String,
     dir: String,
@@ -43,67 +44,20 @@ struct Package {
     prefix: String,
 }
 
-fn packages(fapt: &fapt_pkg::System) -> Result<Vec<Package>> {
-    let mut ret = Vec::new();
-    fapt.walk_sections(|map| {
-        let pkg = map.get_if_one_line("Package").ok_or("invalid Package")?;
-        let version = map.get_if_one_line("Version").ok_or("invalid Version")?;
-        ret.push(Package {
-            prefix: format!("{}/{}_{}", subdir(&pkg), pkg, version),
-
-            pkg: pkg.to_string(),
-            version: version.to_string(),
-            dir: map.get_if_one_line("Directory")
-                .ok_or("invalid Directory")?
-                .to_string(),
-
-            dsc: map.as_ref()["Files"]
-                .iter()
-                .filter(|line| line.ends_with(".dsc"))
-                .next()
-                .unwrap()
-                .split_whitespace()
-                .nth(2)
-                .unwrap()
-                .to_string(),
-
-            size: map.as_ref()["Files"]
-                .iter()
-                .map(|line| {
-                    let num: &str = line.split_whitespace().nth(1).unwrap();
-                    let num: u64 = num.parse().unwrap();
-                    num
-                })
-                .sum(),
-        });
-        Ok(())
-    })?;
-    Ok(ret)
+impl Package {
+    fn container(&self) -> serde_json::Value {
+        serde_json::to_value(&hashmap! {
+            "type" => "debian",
+            "package" => &self.pkg,
+            "version" => &self.version,
+        }).expect("json serialisation can't fail")
+    }
 }
 
 fn run() -> Result<()> {
     let mirror = "http://urika:3142/debian";
 
-    let mut fapt = fapt_pkg::System::cache_dirs_only("lists")?;
-    fapt.add_sources_entry_line(&format!("deb-src {} stretch main contrib non-free", mirror))?;
-    fapt.add_keyring_paths(&["/usr/share/keyrings/debian-archive-keyring.gpg"])?;
-    fapt.update()?;
-
-    let exists_conn = connect()?;
-    let exists_tran = exists_conn.transaction()?;
-    let exists_stat = exists_tran.prepare("SELECT EXISTS(SELECT 1 FROM container WHERE info=$1)")?;
-
-    for package in packages(&fapt)? {
-        let container_info = serde_json::to_value(&hashmap! {
-            "type" => "debian",
-            "package" => &package.pkg,
-            "version" => &package.version,
-        })?;
-
-        if exists_stat.query(&[&container_info])?.get(0).get(0) {
-            continue;
-        }
-
+    for package in deb::incomplete_packages(mirror)? {
         let tmp = tempdir::TempDir::new(&format!(".unpack-{}", package.pkg))?;
         let url = format!("{}/{}/{}", mirror, package.dir, package.dsc);
 
@@ -121,7 +75,7 @@ fn run() -> Result<()> {
         assert!(
             process::Command::new("dpkg-source")
                 .arg("--extract")
-                .arg(package.dsc)
+                .arg(&package.dsc)
                 .arg("t")
                 .current_dir(&tmp)
                 .status()?
@@ -131,7 +85,7 @@ fn run() -> Result<()> {
 
         let mut path = tmp.path().to_path_buf();
         path.push("t");
-        ingest(&container_info, &path)?;
+        ingest(&package.container(), &path)?;
     }
 
     Ok(())
@@ -377,15 +331,6 @@ RETURNING id"
         }
     }
     Ok(map)
-}
-
-// Sigh, I've already written this.
-fn subdir(name: &str) -> &str {
-    if name.starts_with("lib") {
-        &name[..4]
-    } else {
-        &name[..1]
-    }
 }
 
 quick_main!(run);
