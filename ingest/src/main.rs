@@ -7,6 +7,7 @@ extern crate maplit;
 #[macro_use]
 extern crate more_asserts;
 extern crate postgres;
+extern crate rayon;
 extern crate serde_json;
 extern crate sha2;
 extern crate splayers;
@@ -24,6 +25,7 @@ use std::path::Path;
 use std::process;
 
 use byteorder::{ByteOrder, LittleEndian};
+use rayon::prelude::*;
 
 mod deb;
 mod dicts;
@@ -57,8 +59,8 @@ impl Package {
 fn run() -> Result<()> {
     let mirror = "http://urika:3142/debian";
 
-    for package in deb::incomplete_packages(mirror)? {
-        let tmp = tempdir::TempDir::new(&format!(".unpack-{}", package.pkg))?;
+    deb::incomplete_packages(mirror)?.par_iter().for_each(|package| {
+        let tmp = tempdir::TempDir::new(&format!(".unpack-{}", package.pkg)).expect("making temp dir");
         let url = format!("{}/{}/{}", mirror, package.dir, package.dsc);
 
         assert!(
@@ -67,7 +69,8 @@ fn run() -> Result<()> {
                 .arg("--allow-unauthenticated") // TODO: set keyrings
                 .arg(url)
                 .current_dir(&tmp)
-                .status()?
+                .status()
+                .expect("dget")
                 .success(),
             "dget failed"
         );
@@ -78,15 +81,17 @@ fn run() -> Result<()> {
                 .arg(&package.dsc)
                 .arg("t")
                 .current_dir(&tmp)
-                .status()?
+                .status()
+                .expect("dpkg-source")
                 .success(),
             "dpkg-source failed"
         );
 
         let mut path = tmp.path().to_path_buf();
         path.push("t");
-        ingest(&package.container(), &path)?;
-    }
+        ingest(&package.container(), &path)
+            .expect("ingest");
+    });
 
     Ok(())
 }
