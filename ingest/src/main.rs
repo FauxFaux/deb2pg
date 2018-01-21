@@ -65,6 +65,7 @@ fn run() -> Result<()> {
 
         assert!(
             process::Command::new("dget")
+                .arg("--quiet")
                 .arg("--download-only")
                 .arg("--allow-unauthenticated") // TODO: set keyrings
                 .arg(url)
@@ -77,6 +78,8 @@ fn run() -> Result<()> {
 
         assert!(
             process::Command::new("dpkg-source")
+                .arg("--no-copy")
+                .arg("-q")
                 .arg("--extract")
                 .arg(&package.dsc)
                 .arg("t")
@@ -91,6 +94,8 @@ fn run() -> Result<()> {
         path.push("t");
         ingest(&package.container(), &path)
             .expect("ingest");
+
+        println!("IN {} {}", package.pkg, package.version)
     });
 
     Ok(())
