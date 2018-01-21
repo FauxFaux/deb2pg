@@ -84,7 +84,7 @@ impl ShardedStore {
         let mut pack = fs::OpenOptions::new()
             .create(true)
             .append(true)
-            .open(pack_path)?;
+            .open(&pack_path)?;
         ensure!(
             pack.seek(SeekFrom::End(0))? % (eventual_size as u64) == 0,
             "file is improper: {:?}",
