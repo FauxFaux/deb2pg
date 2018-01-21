@@ -85,7 +85,7 @@ fn run() -> Result<()> {
     let mirror = "http://urika:3142/debian";
 
     let mut fapt = fapt_pkg::System::cache_dirs_only("lists")?;
-    fapt.add_sources_entry_line(&format!("deb-src {} sid main contrib non-free", mirror))?;
+    fapt.add_sources_entry_line(&format!("deb-src {} stretch main contrib non-free", mirror))?;
     fapt.add_keyring_paths(&["/usr/share/keyrings/debian-archive-keyring.gpg"])?;
     fapt.update()?;
 
@@ -110,6 +110,7 @@ fn run() -> Result<()> {
         assert!(
             process::Command::new("dget")
                 .arg("--download-only")
+                .arg("--allow-unauthenticated") // TODO: set keyrings
                 .arg(url)
                 .current_dir(&tmp)
                 .status()?
