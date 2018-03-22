@@ -55,13 +55,13 @@ impl<'i> Index<'i> {
             //                println!("limited size index: excluding files in {:?}", path);
             //                continue;
             //            }
-
-            let map = memmap::Mmap::open_path(path, memmap::Protection::Read)?;
+            let file = fs::File::open(path)?;
+            let map = unsafe { memmap::MmapOptions::new().map(&file)? };
 
             assert_eq!(0, map.len() % std::mem::size_of::<u32>());
             let nums_len = map.len() / std::mem::size_of::<u32>();
 
-            let raw = unsafe { slice::from_raw_parts(map.ptr() as *const u32, nums_len) };
+            let raw = unsafe { slice::from_raw_parts(map.as_ptr() as *const u32, nums_len) };
 
             let mut by_tri: Vec<&[u32]> = Vec::new();
             by_tri.resize(MAX_TRI as usize, &[]);

@@ -10,9 +10,9 @@ error-chain = "0.11"
 lz4 = "1"
 num_cpus = "1"
 postgres = "0.15"
-sha2 = "0.6"
+sha2 = "0.7"
 tempfile = "2"
-tempfile-fast = "0.1"
+tempfile-fast = "0.2"
 thread-pool = "0.1"
 
 [dependencies.catfight]

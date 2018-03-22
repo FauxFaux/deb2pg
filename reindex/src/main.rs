@@ -169,8 +169,8 @@ fn main() {
     let mut trigram_count = trigram_count.into_iter();
 
     // ..which we immediately map into memory as an array of Tri(u32)s.
-    let map = memmap::Mmap::open(&temp, memmap::Protection::Read).unwrap();
-    let temp_data = unsafe { std::slice::from_raw_parts((map.ptr()) as *const Tri, map.len() / 4) };
+    let map = unsafe { memmap::MmapOptions::new().map(&temp) }.unwrap();
+    let temp_data = unsafe { std::slice::from_raw_parts((map.as_ptr()) as *const Tri, map.len() / 4) };
 
     // Now, we want to transpose [{A, B, C}, {A, C, E}] into [A: {1, 2}, B: {1}, C: {1, 2}, E: {2}]
 

@@ -1,7 +1,8 @@
 use std::fs;
 use std::io;
 use std::path::Path;
-
+use std::io::Read;
+use std::io::Write;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -12,13 +13,10 @@ use lz4;
 use num_cpus;
 use sha2;
 use tempfile_fast;
+use sha2::Digest;
 
 use errors::*;
 
-use std::ascii::AsciiExt;
-use std::io::Read;
-use std::io::Write;
-use sha2::Digest;
 
 fn tools() -> (sha2::Sha256, lz4::EncoderBuilder) {
     (sha2::Sha256::default(), lz4::EncoderBuilder::new())
@@ -128,7 +126,7 @@ pub fn read(out_dir: &str) -> Result<Vec<TempFile>> {
             continue;
         }
 
-        let mut temp = tempfile_fast::persistable_tempfile_in(&out_dir)?;
+        let mut temp = tempfile_fast::PersistableTempFile::new_in(&out_dir)?;
 
         if en.len < 16 * 1024 * 1024 {
             let mut buf = vec![0u8; en.len as usize];
@@ -187,7 +185,7 @@ fn complete(
         if !written_to_path.exists() {
             if let Err(e) = temp.persist_noclobber(&written_to) {
                 if !written_to_path.exists() {
-                    bail!(e);
+                    bail!(e.error);
                 }
             }
         }

@@ -6,7 +6,7 @@ version = "0.1.0"
 [dependencies]
 byteorder = "1"
 lz4 = "1"
-memmap = "0.5"
+memmap = "0.6"
 tempfile = "2"
 
 [dependencies.catfight]

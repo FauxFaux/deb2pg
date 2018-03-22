@@ -5,17 +5,17 @@ version = "0.1.0"
 
 [dependencies]
 byteorder = "1"
-iron = "~0.5"
-log = "0.3"
-logger = "0.3"
+iron = "~0.6"
+log = "0.4"
+logger = "0.4"
 lz4 = "1"
-persistent = "0.3"
+persistent = "0.4"
 postgres = "0.15"
 r2d2 = "0.8"
 r2d2_postgres = "0.14"
-router = "~0.5"
+router = "~0.6"
 serde_json = "1"
-stderrlog = "0.2"
+stderrlog = "0.3"
 url = "1"
 
 [dependencies.catfight]
