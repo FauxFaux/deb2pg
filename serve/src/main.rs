@@ -137,9 +137,11 @@ fn cat(req: &mut Request) -> IronResult<Response> {
             } else {
                 panic!()
             }
-            Ok(Response::with(
-                (status::Ok, ContentType::plaintext().0, data),
-            ))
+            Ok(Response::with((
+                status::Ok,
+                ContentType::plaintext().0,
+                data,
+            )))
         }
         _ => unimplemented!(),
     }
@@ -198,9 +200,7 @@ fn paths(req: &mut Request) -> IronResult<Response> {
 
     let paths = first
         .into_iter()
-        .map(|f| {
-            f.paths.iter().map(|id| id_paths[id].to_string()).collect()
-        })
+        .map(|f| f.paths.iter().map(|id| id_paths[id].to_string()).collect())
         .collect::<Vec<Vec<String>>>();
 
     Ok(Response::with((

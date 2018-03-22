@@ -1,8 +1,8 @@
 extern crate byteorder;
 #[macro_use]
 extern crate error_chain;
+extern crate iowrap;
 extern crate libc;
-extern crate peeky_read;
 
 mod catfight;
 mod copy;

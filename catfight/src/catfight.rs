@@ -1,37 +1,31 @@
 use std;
 use std::io;
 use std::fs::File;
-
-use libc;
-
-use copy::copy_file;
-
-use errors::*;
-
-use peeky_read::PeekyRead;
-
 use std::io::Read;
-use std::io::Seek;
 use std::io::Write;
 use std::os::unix::io::AsRawFd;
 
+use libc;
+use copy::copy_file;
+use errors::*;
+use iowrap::Eof;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 pub fn align(val: u64) -> u64 {
     (val + 15) / 16 * 16
 }
 
-pub struct Record<'a, R: 'a>
+pub struct Record<R>
 where
     R: io::Read,
 {
-    pub reader: io::Take<PeekyRead<'a, R>>,
+    pub reader: io::Take<Eof<R>>,
     pub extra: Vec<u8>,
     pub len: u64,
     realign: u8,
 }
 
-impl<'a, R> Record<'a, R>
+impl<'a, R> Record<R>
 where
     R: std::io::Read,
 {
@@ -54,9 +48,9 @@ where
     }
 }
 
-pub fn read_record<R: io::Read>(fd: &mut R) -> Result<Option<Record<R>>> {
-    let mut fd = PeekyRead::new(fd);
-    if fd.check_eof()? {
+pub fn read_record<R: io::Read>(fd: R) -> Result<Option<Record<R>>> {
+    let mut fd = Eof::new(fd);
+    if fd.eof()? {
         return Ok(None);
     }
 
@@ -105,7 +99,7 @@ pub fn unlock_flock(what: &File) -> Result<()> {
 }
 
 pub fn writey_write(
-    mut fd: &mut File,
+    fd: &mut File,
     file_end: &mut u64,
     src: &mut File,
     src_len: u64,

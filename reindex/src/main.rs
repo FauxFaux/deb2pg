@@ -152,7 +152,6 @@ fn fill_tris(temp_index: &[TempFileChunk], temp_data: &[Tri], tris: &mut HashMap
     assert_eq!(temp_data.len(), run);
 }
 
-
 fn main() {
     let args: Vec<String> = env::args().collect();
 
@@ -163,21 +162,17 @@ fn main() {
     // remembering where those trigrams referred to, stored in a `temp`orary file.
     let (temp, temp_index, trigram_count) = convert_pack_to_just_trigrams(fp);
 
-
     // Sort the trigrams we've seen by number.
     let mut trigram_count: Vec<(Tri, Count)> =
         trigram_count.into_iter().map(|x| (x.0, x.1)).collect();
     trigram_count.sort();
     let mut trigram_count = trigram_count.into_iter();
 
-
     // ..which we immediately map into memory as an array of Tri(u32)s.
     let map = memmap::Mmap::open(&temp, memmap::Protection::Read).unwrap();
     let temp_data = unsafe { std::slice::from_raw_parts((map.ptr()) as *const Tri, map.len() / 4) };
 
-
     // Now, we want to transpose [{A, B, C}, {A, C, E}] into [A: {1, 2}, B: {1}, C: {1, 2}, E: {2}]
-
 
     // Let's do this in blocks, so we don't run out of memory.
     loop {

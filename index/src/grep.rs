@@ -1,6 +1,5 @@
 use twoway;
 
-use std::str;
 use std::io;
 use std::io::Read;
 

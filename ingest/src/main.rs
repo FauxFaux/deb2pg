@@ -38,8 +38,7 @@ fn run() -> Result<i32> {
     let out_dir = "/mnt/data/t".to_string();
     let container_info = format!(
         "{{'type': 'debian', 'package': '{}', 'version': '{}'}}",
-        package_name,
-        package_version
+        package_name, package_version
     );
 
     let temp_files = temps::read(out_dir.as_str())?;
@@ -184,12 +183,10 @@ SELECT pos FROM blob WHERE h0=$1 AND h1=$2 AND h2=$3 AND h3=$4 AND len=$5
 ",
     )?;
     let result = statement.query(&[&h0, &h1, &h2, &h3, &len])?;
-    Ok(
-        result
-            .iter()
-            .next()
-            .map(|row| row.get::<usize, i64>(0) as u64),
-    )
+    Ok(result
+        .iter()
+        .next()
+        .map(|row| row.get::<usize, i64>(0) as u64))
 }
 
 fn decompose(hash: [u8; 256 / 8]) -> (i64, i64, i64, i64) {
@@ -220,9 +217,10 @@ RETURNING id",
                 Some(row) => row.get(0),
                 None => match read_back.query(&[&path])?.iter().next() {
                     Some(row) => row.get(0),
-                    None => bail!(ErrorKind::InvalidState(
-                        format!("didn't write and didn't find '{}'", path),
-                    )),
+                    None => bail!(ErrorKind::InvalidState(format!(
+                        "didn't write and didn't find '{}'",
+                        path
+                    ),)),
                 },
             };
 

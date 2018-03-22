@@ -49,7 +49,6 @@ impl<'i> Index<'i> {
                 tmp
             };
 
-
             let (size_hint, addendum) =
                 names::addendum_from_path(path.file_name().unwrap().to_str().unwrap());
             //            if size_hint > 4 {

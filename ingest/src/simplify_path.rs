@@ -75,7 +75,6 @@ fn strip_prefix<T>(off_of: HashMap<String, T>) -> (String, HashMap<String, T>) {
     }
 }
 
-
 fn fixup_path_internal(
     structure: HashMap<String, Node>,
     so_far: &[String],
@@ -84,7 +83,6 @@ fn fixup_path_internal(
     //    [(['a', 'b/', 'c'], 3), (['a', 'b/', 'd'], 4)]
 
     let mut ret = Vec::new();
-
 
     for (item, sub) in structure {
         let mut next: Vec<String> = so_far.iter().map(|s| s.to_string()).collect();
@@ -110,7 +108,6 @@ fn fixup_path_internal(
     ret
 }
 
-
 fn fixup_path(structure: HashMap<String, Node>) -> Vec<(Vec<String>, usize)> {
     //    >>> list(fixup_path({'a/b': 3, 'a/c': 4}))
     //    [(['a/', 'b'], 3), (['a/', 'c'], 4)]
@@ -123,14 +120,12 @@ fn fixup_path(structure: HashMap<String, Node>) -> Vec<(Vec<String>, usize)> {
     }
 }
 
-
 pub fn simplify(input: Vec<Vec<&String>>) -> Vec<Vec<String>> {
     let tree = list_to_tree(input);
     let mut fixed = fixup_path(tree);
     fixed.sort_by_key(|x| x.1);
     fixed.into_iter().map(|x| x.0).collect()
 }
-
 
 fn add(into: &mut HashMap<String, Node>, remaining: &[&String], pos: usize) {
     match remaining.len() {
@@ -192,9 +187,7 @@ mod tests {
 
     fn to_vec(what: &[&[&str]]) -> Vec<Vec<String>> {
         what.iter()
-            .map(|inner| {
-                inner.iter().map(|x| x.to_string()).collect::<Vec<String>>()
-            })
+            .map(|inner| inner.iter().map(|x| x.to_string()).collect::<Vec<String>>())
             .collect::<Vec<Vec<String>>>()
     }
 

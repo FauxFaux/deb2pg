@@ -117,9 +117,7 @@ pub fn trigrams_for<T: Iterator<Item = CharResult>>(input: T) -> Result<BitSet> 
     let mut ret: BitSet = BitSet::with_capacity(64 * 64 * 64);
 
     for (off, maybe_char) in input.enumerate() {
-        let c = try!(maybe_char.map_err(|e| {
-            format!("line {}: file char {}: failed: {}", line, off, e)
-        }));
+        let c = maybe_char.map_err(|e| format!("line {}: file char {}: failed: {}", line, off, e))?;
         if '\n' == c {
             line += 1;
         }
