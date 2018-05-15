@@ -58,9 +58,12 @@ impl Package {
 
 fn run() -> Result<()> {
     let mirror = "http://urika:3142/debian";
+    let packages = deb::incomplete_packages(mirror)?;
 
-    deb::incomplete_packages(mirror)?.par_iter().for_each(|package| {
-        println!("IN {} {}", package.pkg, package.version);
+    println!("{} to process", packages.len());
+
+    packages.par_iter().for_each(|package| {
+        println!("STRT {} {}", package.pkg, package.version);
 
         let tmp = tempdir::TempDir::new(&format!(".unpack-{}", package.pkg)).expect("making temp dir");
         let url = format!("{}/{}/{}", mirror, package.dir, package.dsc);
@@ -96,6 +99,8 @@ fn run() -> Result<()> {
         path.push("t");
         ingest(&package.container(), &path)
             .expect("ingest");
+
+        println!("COMP {} {}", package.pkg, package.version);
     });
 
     Ok(())
